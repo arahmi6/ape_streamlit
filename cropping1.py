@@ -1,10 +1,85 @@
 import cv2
 import numpy as np
 import math
+from matplotlib import pyplot as plt
 
-class CropLuar():
-  # TOO MANY - DEFINE ENERGY (ENERGY = MEAN_DISTANCE / SQRT(LENGTH +1)
-  def myCandidates(imIn, lines):
+def resize(img):
+    resized_img = cv2.resize(img,None,fx=0.1, fy=0.1, interpolation = cv2.INTER_CUBIC)
+    return resized_img
+
+def convert_to_lab(img):
+    lab_image = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
+    l_channel,a_channel,b_channel = cv2.split(lab_image)
+    return l_channel, a_channel, b_channel, lab_image
+
+def closing_l(l_channel):
+    kernel = np.ones((2,2), np.uint8)
+    img_l = cv2.morphologyEx(l_channel, cv2.MORPH_CLOSE, kernel)
+    return img_l
+
+def erosion_a(a_channel):
+    kernel = np.ones((3,3), np.uint8)
+    img_a = cv2.erode(a_channel,kernel,iterations = 1)
+    return img_a
+
+def sumlab(img_l, img_a, img_b):
+    kernel = np.ones((3,3), np.uint8)
+    imgra_l = cv2.morphologyEx(img_l, cv2.MORPH_GRADIENT, kernel)
+    imgra_a = cv2.morphologyEx(img_a, cv2.MORPH_GRADIENT, kernel)
+    imgra_b = cv2.morphologyEx(img_b, cv2.MORPH_GRADIENT, kernel)
+    imgra = imgra_l + imgra_a + imgra_b
+    return imgra, imgra_l, imgra_a, imgra_b
+
+def thresh_image(imgra):
+    ret, thresh = cv2.threshold(imgra,0,255,cv2.THRESH_TRIANGLE)
+    return thresh
+
+def setmarker(thresh):
+    marker = cv2.bitwise_not(thresh)
+    kernel = np.ones((3,3), np.uint8)
+    marker = cv2.erode(marker, kernel)
+    ret, marker = cv2.connectedComponents(marker)
+    return marker
+
+def watershed_image(imgra_l,imgra_a,imgra_b,marker):
+    imgra = cv2.merge((imgra_l,imgra_a,imgra_b))
+    imws = cv2.watershed(imgra,marker)
+    return imws, imgra
+
+def convert_watershed_uint8(imws):
+    imws8 = np.uint8(imws)
+    lenx, leny = imws.shape
+    imws8[imws>=0] = 0
+    imws8[imws==-1] = 255
+    for i in range(lenx):
+        imws8[i][0] = 0
+        imws8[i][leny-1] = 0
+    for j in range(leny):
+        imws8[0][j] = 0
+        imws8[lenx-1][j] = 0
+    return imws8
+
+def hough(img, imws8):
+    imgcopy = img.copy()
+    lines = cv2.HoughLines(imws8,1,np.pi/180,10)
+
+    for x in range(0,len(lines)):
+        for rho,theta in lines[x]:
+            a = np.cos(theta)
+            b = np.sin(theta)
+            x0 = a*rho
+            y0 = b*rho
+            x1 = int(x0 + 1000*(-b))
+            y1 = int(y0 + 1000*(a))
+            x2 = int(x0 - 1000*(-b))
+            y2 = int(y0 - 1000*(a))
+
+            cv2.line(imgcopy,(x1,y1),(x2,y2),(0,0,255),1)
+            
+    return imgcopy, lines
+
+def myCandidates(imIn, lines):
+    
     imTmp = imIn.copy() 
     imTmp = 255 - imTmp # inverse the imTmp
     dist = cv2.distanceTransform(imTmp, cv2.DIST_L2, 3)
@@ -12,103 +87,82 @@ class CropLuar():
     imLine = imIn.copy()
     candidates = []
     for x in range(len(lines)):
-      for rho,theta in lines[x]:
-        imLine[:][:] = 0
-        distTmp = dist.copy()
-        a = np.cos(theta)
-        b = np.sin(theta)
-        x0 = a*rho
-        y0 = b*rho
-        x1 = int(x0 + 1000*(-b))
-        y1 = int(y0 + 1000*(a))
-        x2 = int(x0 - 1000*(-b))
-        y2 = int(y0 - 1000*(a))
-        cv2.line(imLine,(x1,y1),(x2,y2),255,1)
+        for rho,theta in lines[x]:
+            imLine[:][:] = 0
+            distTmp = dist.copy()
+            a = np.cos(theta)
+            b = np.sin(theta)
+            x0 = a*rho
+            y0 = b*rho
+            x1 = int(x0 + 1000*(-b))
+            y1 = int(y0 + 1000*(a))
+            x2 = int(x0 - 1000*(-b))
+            y2 = int(y0 - 1000*(a))
+            cv2.line(imLine,(x1,y1),(x2,y2),255,1)
             
-        imLine[dist>3]=0
-        distTmp[imLine==0]=0
+            imLine[dist>3]=0
+            distTmp[imLine==0]=0
             
-        length = (imLine!=0).sum()
-        meanDist = distTmp.sum()/(imLine!=0).sum()
-        energy = meanDist / math.sqrt(length + 1)
-        candidates.append([rho, theta, energy])
+            length = (imLine!=0).sum()
+            meanDist = distTmp.sum()/(imLine!=0).sum()
+            energy = meanDist / math.sqrt(length + 1)
+            candidates.append([rho, theta, energy])
     return candidates
-  
-  # Sort the candidate lines by their energies in ascending order
-  def takeThird(elem):
+
+# Sort the candidate lines by their energies in ascending order
+def takeThird(elem):
     return elem[2]
+
+def calc_energy(imws8, lines):
+  candidateLines = myCandidates(imws8, lines)
+  verticalLines = []
+  horizontalLines = []
+  for x in candidateLines:
+      if (x[1]>=np.pi/4 and x[1]<3*np.pi/4):
+          horizontalLines.append(x)
+      else:
+          verticalLines.append(x)
+
+  retvalvert = []
+  retvalhor = []
   
-  def takeX(elem):
-    return (elem[0][0] + elem[1][0]) / 2
+  verticalLines.sort(key=takeThird)
+  horizontalLines.sort(key=takeThird)
+
+  for y in verticalLines[:10]:
+    angle_deg = np.degrees(y[1])  # Konversi kemiringan garis ke derajat
+    # print("Vert", angle_deg)
+    if (angle_deg <= 10 and angle_deg >= -10) or (angle_deg <= 190 and angle_deg >= 170):
+    #   print("In", y)
+      retvalvert.append(y)
   
-  def takeY(elem):
-    return (elem[0][1] + elem[1][1]) /2
-  
-  def input_img(data):
-    img = data
-    orig_img = img.copy()
+  for z in horizontalLines[:10]:
+    angle_deg = np.degrees(z[1])  # Konversi kemiringan garis ke derajat
+    # print("Horiz", angle_deg)
+    if (angle_deg >= 80 and angle_deg <= 100) or (angle_deg >= 260 and angle_deg <= 280):
+    #   print("In", z)
+      retvalhor.append(z)
+#   print("Retvalvert", retvalvert)
+#   print("Retvalhor", retvalhor)
+  return retvalvert, retvalhor
 
-    # resize for speed
-    img = cv2.resize(img,None,fx=0.1, fy=0.1, interpolation = cv2.INTER_CUBIC)
-    return orig_img, img
+def draw(imIn, candidateLines, color=(255,0,0), scale_factor=1, thick=1, length=1000):
+    for rho, theta, _ in candidateLines:
+        a = np.cos(theta)
+        b = np.sin(theta)
+        x0 = a*rho*scale_factor
+        y0 = b*rho*scale_factor
+        x1 = int(x0 + length*(-b*scale_factor))
+        y1 = int(y0 + length*(a*scale_factor))
+        x2 = int(x0 - length*(-b*scale_factor))
+        y2 = int(y0 - length*(a*scale_factor))
+        cv2.line(imIn,(x1,y1),(x2,y2),color,thick)
+    return imIn
 
-  def preprocess_img(path_img):
-    orig_img, img = CropLuar.input_img(path_img)
-    # CONVERT TO LAB AND SPLIT
-    lab_image = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
-    l_channel,a_channel,b_channel = cv2.split(lab_image)
-
-    # CLOSING CHANNEL - BEFORE AND AFTER
-    kernel = np.ones((2,2), np.uint8)
-    img_l = cv2.morphologyEx(l_channel, cv2.MORPH_CLOSE, kernel)
-
-    kernel = np.ones((3,3), np.uint8)
-    img_a = cv2.erode(a_channel, kernel, iterations = 1)
-
-    img_b = b_channel
-
-    # GRADIENT ON 3 CHANNEL, SUM THEM UP
-    kernel = np.ones((3,3), np.uint8)
-    imgra_l = cv2.morphologyEx(img_l, cv2.MORPH_GRADIENT, kernel)
-    imgra_a = cv2.morphologyEx(img_a, cv2.MORPH_GRADIENT, kernel)
-    imgra_b = cv2.morphologyEx(img_b, cv2.MORPH_GRADIENT, kernel)
-    imgra = imgra_l + imgra_a + imgra_b
-
-    # TRIANGLE THRESHOLD
-    ret, thresh = cv2.threshold(imgra,0,255,cv2.THRESH_TRIANGLE)
-
-    # BLACK AREAS CLASSIFIED INTO SEVERAL CONNECTED AREA, DEFINE MARKER FROM THAT
-    marker = cv2.bitwise_not(thresh)
-    kernel = np.ones((3,3), np.uint8)
-    marker = cv2.erode(marker, kernel)
-    ret, marker = cv2.connectedComponents(marker)
-
-    # WATERSHED
-    imgra = cv2.merge((imgra_l,imgra_a,imgra_b))
-    imws = cv2.watershed(imgra,marker)
-
-    # CONVERT WATERSHED
-    imws8 = np.uint8(imws)
-
-    # Set the boundaries to 255 and the other regions to 0. 
-    lenx, leny = imws.shape
-    imws8[imws>=0] = 0
-    imws8[imws==-1] = 255
-
-    # Since the global edge of the watershed image is set as boundaries, we have to delete its four boundaries.
-    for i in range(lenx):
-        imws8[i][0] = 0
-        imws8[i][leny-1] = 0
-    for j in range(leny):
-        imws8[0][j] = 0
-        imws8[lenx-1][j] = 0
-
-    # HOUGHLINE
+def draw_all(img, verticalLines, horizontalLines):
+    # Draw the lines
     imgcopy = img.copy()
-    lines = cv2.HoughLines(imws8,1,np.pi/180,10)
-
-    for x in range(0,len(lines)):
-      for rho,theta in lines[x]:
+    for rho, theta, _ in verticalLines:
         a = np.cos(theta)
         b = np.sin(theta)
         x0 = a*rho
@@ -117,27 +171,21 @@ class CropLuar():
         y1 = int(y0 + 1000*(a))
         x2 = int(x0 - 1000*(-b))
         y2 = int(y0 - 1000*(a))
+        cv2.line(imgcopy,(x1,y1),(x2,y2),(255,0,0),1)
+        
+    for rho, theta, _ in horizontalLines:
+        a = np.cos(theta)
+        b = np.sin(theta)
+        x0 = a*rho
+        y0 = b*rho
+        x1 = int(x0 + 1000*(-b))
+        y1 = int(y0 + 1000*(a))
+        x2 = int(x0 - 1000*(-b))
+        y2 = int(y0 - 1000*(a))
+        cv2.line(imgcopy,(x1,y1),(x2,y2),(0,255,0),1)
+    return imgcopy
 
-        cv2.line(imgcopy,(x1,y1),(x2,y2),(0,0,255),1)
-
-    # Calculate the energy of each candidate line and obtain a list [rho, theta, energy]
-    candidateLines = CropLuar.myCandidates(imws8, lines)
-
-    # Divide the lines into vertical lines and horizontal lines
-    verticalLines = []
-    horizontalLines = []
-    for x in candidateLines:
-      if (x[1]>=np.pi/4 and x[1]<3*np.pi/4):
-        horizontalLines.append(x)
-      else:
-        verticalLines.append(x)
-    
-    verticalLines.sort(key=CropLuar.takeThird)
-    horizontalLines.sort(key=CropLuar.takeThird)
-    
-    return img, verticalLines, horizontalLines
-  
-  def crop_and_skew(image, points):
+def crop_and_skew(image, points):
     # Convert points to numpy array
     points = np.array(points, dtype=np.float32)
     
@@ -156,7 +204,7 @@ class CropLuar():
     
     return output_image
 
-  def polar_dot_to_cartesian_line(candidateLines):
+def polar_dot_to_cartesian_line(candidateLines):
     lines=[]
     for rho, theta, _ in candidateLines:
         a = np.cos(theta)
@@ -170,254 +218,332 @@ class CropLuar():
         lines.append([[x1, y1], [x2, y2]])
     return lines
 
-  def interpolate_y(carte_line, target_x):
-      x1 = carte_line[0][0]
-      y1 = carte_line[0][1]
-      x2 = carte_line[1][0]
-      y2 = carte_line[1][1]
-      if x1 != x2:
-          y = y1 + ((target_x - x1) * (y2 - y1)) / (x2 - x1)
-          return y
-      else:
-          return None
+def interpolate_y(carte_line, target_x):
+    x1 = carte_line[0][0]
+    y1 = carte_line[0][1]
+    x2 = carte_line[1][0]
+    y2 = carte_line[1][1]
+    if x1 != x2:
+        y = y1 + ((target_x - x1) * (y2 - y1)) / (x2 - x1)
+        return y
+    else:
+        return None
 
-  def interpolate_x(carte_line, target_y):
-      x1 = carte_line[0][0]
-      y1 = carte_line[0][1]
-      x2 = carte_line[1][0]
-      y2 = carte_line[1][1]
-      if y1 != y2:
-          x = x1 + ((target_y - y1) * (x2 - x1)) / (y2 - y1)
-          return x
-      else:
-          return None
+def interpolate_x(carte_line, target_y):
+    x1 = carte_line[0][0]
+    y1 = carte_line[0][1]
+    x2 = carte_line[1][0]
+    y2 = carte_line[1][1]
+    if y1 != y2:
+        x = x1 + ((target_y - y1) * (x2 - x1)) / (y2 - y1)
+        return x
+    else:
+        return None
 
-  def verify_temp_res(temp_res, img):
-    if(temp_res[0] != None and temp_res[1] != None):
-        if(temp_res[0] >= 0 and temp_res[0] <= img.shape[1] and temp_res[1] >=0 and temp_res[1] <= img.shape[0]):
-          return True
-    return False
+def verify_temp_res(temp_res, img):
+  if(temp_res[0] != None and temp_res[1] != None):
+      if(temp_res[0] >= 0 and temp_res[0] <= img.shape[1] and temp_res[1] >=0 and temp_res[1] <= img.shape[0]):
+        return True
+  return False
 
-  def convert_lines_in_image(carte_lines, img):
-    res = []
+def convert_lines_in_image(carte_lines, img):
+  res = []
 
-    for carte_line in carte_lines:
-      dotone = []
-      dottwo = []
+  for carte_line in carte_lines:
+    dotone = []
+    dottwo = []
 
-      x = img.shape[1]
-      temp_res1 = [x, CropLuar.interpolate_y(carte_line, x)]
-      if(CropLuar.verify_temp_res(temp_res1, img)):
-        if(dotone==[]):
-          dotone = temp_res1
-        elif(dottwo==[]):
-          dottwo = temp_res1
+    x = img.shape[1]
+    temp_res1 = [x, interpolate_y(carte_line, x)]
+    if(verify_temp_res(temp_res1)):
+      if(dotone==[]):
+        dotone = temp_res1
+      elif(dottwo==[]):
+        dottwo = temp_res1
+    
+    x = 0
+    temp_res2 = [x, interpolate_y(carte_line, x)]
+    if(verify_temp_res(temp_res2)):
+      if(dotone==[]):
+        dotone = temp_res2
+      elif(dottwo==[]):
+        dottwo = temp_res2
+    
+    y = img.shape[0]
+    temp_res3 = [interpolate_x(carte_line, y), y]
+    if(verify_temp_res(temp_res3)):
+      if(dotone==[]):
+        dotone = temp_res3
+      elif(dottwo==[]):
+        dottwo = temp_res3
+    
+    y = 0
+    temp_res4 = [interpolate_x(carte_line, y), y]
+    if(verify_temp_res(temp_res4)):
+      if(dotone==[]):
+        dotone = temp_res4
+      elif(dottwo==[]):
+        dottwo = temp_res4
+
+    if(dotone!=[] and dottwo!=[]):
+      res.append([dotone, dottwo])
       
-      x = 0
-      temp_res2 = [x, CropLuar.interpolate_y(carte_line, x)]
-      if(CropLuar.verify_temp_res(temp_res2, img)):
-        if(dotone==[]):
-          dotone = temp_res2
-        elif(dottwo==[]):
-          dottwo = temp_res2
-      
-      y = img.shape[0]
-      temp_res3 = [CropLuar.interpolate_x(carte_line, y), y]
-      if(CropLuar.verify_temp_res(temp_res3, img)):
-        if(dotone==[]):
-          dotone = temp_res3
-        elif(dottwo==[]):
-          dottwo = temp_res3
-      
-      y = 0
-      temp_res4 = [CropLuar.interpolate_x(carte_line, y), y]
-      if(CropLuar.verify_temp_res(temp_res4, img)):
-        if(dotone==[]):
-          dotone = temp_res4
-        elif(dottwo==[]):
-          dottwo = temp_res4
+  return res
 
-      if(dotone!=[] and dottwo!=[]):
-        res.append([dotone, dottwo])
-        
-    return res
+def vertical_divider(carte_vert_filtered, img):
+  carte_left = []
+  carte_right = []
+  for carte_vert in carte_vert_filtered:
+    center = [img.shape[1]/2, img.shape[0]/2]
+    x1 = carte_vert[0][0]
+    y1 = carte_vert[0][1]
+    x2 = carte_vert[1][0]
+    y2 = carte_vert[1][1]
+    if(((x1 + x2)/2)<center[0]):
+      carte_left.append(carte_vert)
+    else:
+      carte_right.append(carte_vert)
+  return carte_left, carte_right
 
-  def vertical_divider(carte_vert_filtered, img):
-    carte_left = []
-    carte_right = []
-    for carte_vert in carte_vert_filtered:
-      center = [img.shape[1]/2, img.shape[0]/2]
-      x1 = carte_vert[0][0]
-      y1 = carte_vert[0][1]
-      x2 = carte_vert[1][0]
-      y2 = carte_vert[1][1]
-      if(((x1 + x2)/2)<center[0]):
-        carte_left.append(carte_vert)
-      else:
-        carte_right.append(carte_vert)
+def horizontal_divider(carte_vert_filtered, img):
+  carte_top = []
+  carte_bot = []
+  for carte_vert in carte_vert_filtered:
+    center = [img.shape[1]/2, img.shape[0]/2]
+    x1 = carte_vert[0][0]
+    y1 = carte_vert[0][1]
+    x2 = carte_vert[1][0]
+    y2 = carte_vert[1][1]
+    if(((y1 + y2)/2)<center[1]):
+      carte_top.append(carte_vert)
+    else:
+      carte_bot.append(carte_vert)
+  return carte_top, carte_bot
+
+def handle_left_right(carte_left, carte_right, img):
+    if(len(carte_left)==0):
+        carte_right=[]
+    if(len(carte_right)==0):
+        carte_left=[]
+    if(len(carte_left)<1):
+        carte_left.append([[0.0 , 0.0], [0.0, img.shape[0]]])
+    if(len(carte_right)<1):
+        carte_right.append([[img.shape[1] , 0.0], [img.shape[1], img.shape[0]]])
     return carte_left, carte_right
-  
-  def horizontal_divider(carte_vert_filtered, img):
-    carte_top = []
-    carte_bot = []
-    for carte_vert in carte_vert_filtered:
-      center = [img.shape[1]/2, img.shape[0]/2]
-      x1 = carte_vert[0][0]
-      y1 = carte_vert[0][1]
-      x2 = carte_vert[1][0]
-      y2 = carte_vert[1][1]
-      if(((y1 + y2)/2)<center[1]):
-        carte_top.append(carte_vert)
-      else:
-        carte_bot.append(carte_vert)
-    return carte_top, carte_bot
 
-  def find_intersection_points_exper(lines1, lines2, h, w, toZero = True, vertical = True):
-      intersection_points = []
-      max_intersections = 0
-      line_with_max_intersections = None
-      same_max_intersections = []
-      retval = None
-      count_max_intersections = 0
-      for line1 in lines1:
-          intersections = 0
-
-          for line2 in lines2:
-              x1, y1 = line1[0]
-              x2, y2 = line1[1]
-              x3, y3 = line2[0]
-              x4, y4 = line2[1]
-
-              denominator = ((x1 - x2) * (y3 - y4)) - ((y1 - y2) * (x3 - x4))
-
-              if denominator != 0:
-                  x = (((x1 * y2 - y1 * x2) * (x3 - x4)) - ((x1 - x2) * (x3 * y4 - y3 * x4))) / denominator
-                  y = (((x1 * y2 - y1 * x2) * (y3 - y4)) - ((y1 - y2) * (x3 * y4 - y3 * x4))) / denominator
-                  if(((x <= w) and (x >= 0)) and ((y <= h) and (y >= 0))):
-                    intersection_points.append([x, y])
-                    intersections += 1
-          if intersections > max_intersections:
-            max_intersections = intersections
-            line_with_max_intersections = line1
-            same_max_intersections = []
-            count_max_intersections = 0
-          if intersections == max_intersections:
-            count_max_intersections += 1
-            same_max_intersections.append(line1)
-          else:
-            line_with_max_intersections = line1
-      
-      if(vertical):
-        same_max_intersections.sort(key=CropLuar.takeX)
-      else:
-        same_max_intersections.sort(key=CropLuar.takeY)
-
-      if(toZero):
-        retval = same_max_intersections[0]
-      else:
-        retval = same_max_intersections[-1]
-      return same_max_intersections[0], intersection_points
-
-  def find_intersection_points_from_line(line1, line2):
-      x1, y1 = line1[0]
-      x2, y2 = line1[1]
-      x3, y3 = line2[0]
-      x4, y4 = line2[1]
-      denominator = ((x1 - x2) * (y3 - y4)) - ((y1 - y2) * (x3 - x4))
-      if denominator != 0:
-        x = (((x1 * y2 - y1 * x2) * (x3 - x4)) - ((x1 - x2) * (x3 * y4 - y3 * x4))) / denominator
-        y = (((x1 * y2 - y1 * x2) * (y3 - y4)) - ((y1 - y2) * (x3 * y4 - y3 * x4))) / denominator
-
-        return [x, y]
-
-      return None
-
-  def timesten(best_point):
-    return best_point[0]*10, best_point[1]*10
-
-  def getLinesAndCrop(path_img):
-    # vert hori
-    img, verticalLines, horizontalLines = CropLuar.preprocess_img(path_img)
-    carte_vert = CropLuar.polar_dot_to_cartesian_line(verticalLines[0:10])
-    carte_horiz = CropLuar.polar_dot_to_cartesian_line(horizontalLines[0:10])
-
-    carte_vert_filtered = CropLuar.convert_lines_in_image(carte_vert, img)
-    carte_horiz_filtered = CropLuar.convert_lines_in_image(carte_horiz, img)
-
-    # kiri kanan
-    carte_left, carte_right = CropLuar.vertical_divider(carte_vert_filtered, img)
-    carte_left.append([[0.0 , 0.0], [0.0, img.shape[0]]])
-    carte_right.append([[img.shape[1] , 0.0], [img.shape[1], img.shape[0]]])
-
-    orig_img, img_skip = CropLuar.input_img(path_img)
+def draw_lr(carte_left, carte_right, orig_img):
     img1 = cv2.resize(orig_img,None,fx=0.1, fy=0.1, interpolation = cv2.INTER_CUBIC)
-
     for carte in carte_left:
-      x1 = int(carte[0][0])
-      y1 = int(carte[0][1])
-      x2 = int(carte[1][0])
-      y2 = int(carte[1][1])
-      cv2.line(img1,(x1,y1),(x2,y2),(255, 0, 0), 1)
+        x1 = int(carte[0][0])
+        y1 = int(carte[0][1])
+        x2 = int(carte[1][0])
+        y2 = int(carte[1][1])
+        cv2.line(img1,(x1,y1),(x2,y2),(255, 0, 0), 1)
 
     for carte in carte_right:
-      x1 = int(carte[0][0])
-      y1 = int(carte[0][1])
-      x2 = int(carte[1][0])
-      y2 = int(carte[1][1])
-      cv2.line(img1,(x1,y1),(x2,y2),(0, 0, 255), 1)
+        x1 = int(carte[0][0])
+        y1 = int(carte[0][1])
+        x2 = int(carte[1][0])
+        y2 = int(carte[1][1])
+        cv2.line(img1,(x1,y1),(x2,y2),(0, 0, 255), 1)
 
-    # atas bawah
-    carte_top, carte_bot = CropLuar.horizontal_divider(carte_horiz_filtered, img)
-    carte_top.append([[0.0 , 0.0], [img.shape[1], 0.0]])
-    carte_bot.append([[0.0 , img.shape[0]], [img.shape[1], img.shape[0]]])
+    return img1
 
+def handle_top_bot(carte_top, carte_bot, img):
+    if(len(carte_top)==0):
+        carte_bot=[]
+    if(len(carte_bot)==0):
+        carte_top=[]
+    if(len(carte_top)<1):
+        carte_top.append([[0.0 , 0.0], [img.shape[1], 0.0]])
+    if(len(carte_bot)<1):
+        carte_bot.append([[0.0 , img.shape[0]], [img.shape[1], img.shape[0]]])
+    return carte_top, carte_bot
+
+def draw_tb(carte_top, carte_bot, orig_img):
     img2 = cv2.resize(orig_img,None,fx=0.1, fy=0.1, interpolation = cv2.INTER_CUBIC)
     for carte in carte_top:
-      x1 = int(carte[0][0])
-      y1 = int(carte[0][1])
-      x2 = int(carte[1][0])
-      y2 = int(carte[1][1])
-      cv2.line(img2,(x1,y1),(x2,y2),(255, 255, 0), 1)
+        x1 = int(carte[0][0])
+        y1 = int(carte[0][1])
+        x2 = int(carte[1][0])
+        y2 = int(carte[1][1])
+        cv2.line(img2,(x1,y1),(x2,y2),(255, 255, 0), 1)
 
     for carte in carte_bot:
-      x1 = int(carte[0][0])
-      y1 = int(carte[0][1])
-      x2 = int(carte[1][0])
-      y2 = int(carte[1][1])
-      cv2.line(img2,(x1,y1),(x2,y2),(0, 255, 255), 1)
-    
-    img3 = cv2.resize(orig_img,None,fx=0.1, fy=0.1, interpolation = cv2.INTER_CUBIC)
-    for carte in carte_horiz_filtered:
-      x1 = int(carte[0][0])
-      y1 = int(carte[0][1])
-      x2 = int(carte[1][0])
-      y2 = int(carte[1][1])
-      cv2.line(img3,(x1,y1),(x2,y2),(255, 0, 0), 1)
+        x1 = int(carte[0][0])
+        y1 = int(carte[0][1])
+        x2 = int(carte[1][0])
+        y2 = int(carte[1][1])
+        cv2.line(img2,(x1,y1),(x2,y2),(0, 255, 255), 1)
+    return img2
 
-    for carte in carte_vert_filtered:
-      x1 = int(carte[0][0])
-      y1 = int(carte[0][1])
-      x2 = int(carte[1][0])
-      y2 = int(carte[1][1])
-      cv2.line(img3,(x1,y1),(x2,y2),(0, 0, 255), 1)
-    
-    carte_top_filtered, titik_potong = CropLuar.find_intersection_points_exper(carte_top, carte_vert_filtered, img.shape[0], img.shape[1], True, False)
-    carte_bot_filtered, titik_potong = CropLuar.find_intersection_points_exper(carte_bot, carte_vert_filtered, img.shape[0], img.shape[1], False, False)
-    carte_left_filtered, titik_potong = CropLuar.find_intersection_points_exper(carte_left, carte_horiz_filtered, img.shape[0], img.shape[1], True, True)
-    carte_right_filtered, titik_potong = CropLuar.find_intersection_points_exper(carte_right, carte_horiz_filtered, img.shape[0], img.shape[1], False, True)
+def draw_rl_tb( carte_left, carte_right, carte_top, carte_bot, orig_img):
+    imagedrawed = draw_lr(carte_left, carte_right, orig_img)
+    imagedrawed2 = draw_tb(carte_top, carte_bot, imagedrawed)
+    return imagedrawed2
 
-    best_kiri_atas = CropLuar.find_intersection_points_from_line(carte_top_filtered, carte_left_filtered)
-    best_kiri_bawah = CropLuar.find_intersection_points_from_line(carte_bot_filtered, carte_left_filtered)
-    best_kanan_atas = CropLuar.find_intersection_points_from_line(carte_top_filtered, carte_right_filtered)
-    best_kanan_bawah = CropLuar.find_intersection_points_from_line(carte_bot_filtered, carte_right_filtered)
+def find_gradient_difference(lines):
+    gradients = []
+    line_gradients = []
 
+    for line in lines:
+        x1, y1 = line[0]
+        x2, y2 = line[1]
+
+        if x2 - x1 != 0:
+            gradient = (y2 - y1) / (x2 - x1)
+        else:
+            return float('-inf'), float('inf'), float('inf'), lines[0], float('inf'), gradients
+
+        gradients.append(gradient)
+        line_gradients.append((gradient, line))
+
+    if not gradients:
+        return None, None, None, None, None, None  # Handling case when no valid gradients found
+
+    min_gradient = min(gradients)
+    max_gradient = max(gradients)
+    avg_gradient = sum(gradients) / len(gradients)
+
+    closest_line = line_gradients[0][1]  # Inisialisasi closest_line dengan garis pertama
+    closest_difference = abs(line_gradients[0][0] - avg_gradient)  # Inisialisasi closest_difference dengan selisih pertama
+
+    for gradient, line in line_gradients:
+        difference = abs(gradient - avg_gradient)
+        if difference < closest_difference:
+            closest_difference = difference
+            closest_line = line
+
+    gradient_difference = max_gradient - min_gradient
+
+    return min_gradient, max_gradient, avg_gradient, closest_line, gradient_difference, gradients
+
+def cari_garis_terdekat(array, gradien):
+    selisih_terkecil = float('inf')
+    garis_terdekat = array[0]
+
+    for garis in array:
+        x1, y1 = garis[0]
+        x2, y2 = garis[1]
+        print(garis)
+        # Menghindari pembagian oleh nol
+        print(x2, x1)
+        if x2 - x1 != 0:
+            gradien_garis = (y2 - y1) / (x2 - x1)
+            # print(garis, gradien_garis)
+            selisih = abs(gradien_garis - gradien)
+            print("Selisih", selisih)
+            if selisih <= selisih_terkecil:
+                selisih_terkecil = selisih
+                garis_terdekat = garis
+
+    return garis_terdekat
+
+def handle_tb_gradient_diff( top_gradient_difference, bot_gradient_difference, top_avg_gradient, bot_avg_gradient, top_closest_line, bot_closest_line, carte_top, carte_bot):
+    if(top_gradient_difference <= bot_gradient_difference):
+        xbestbot = cari_garis_terdekat(carte_bot, top_avg_gradient)
+        xbesttop = top_closest_line
+    else:
+        xbesttop= cari_garis_terdekat(carte_top, bot_avg_gradient)
+        xbestbot = bot_closest_line
+    return xbesttop, xbestbot
+
+def handle_lr_gradient_diff( left_gradient_difference, right_gradient_difference, left_avg_gradient, right_avg_gradient, left_closest_line, right_closest_line, carte_left, carte_right):
+    if(left_gradient_difference <= right_gradient_difference):
+        xbestright = cari_garis_terdekat(carte_right, left_avg_gradient)
+        xbestleft = left_closest_line
+    else:
+        xbestleft= cari_garis_terdekat(carte_left, right_avg_gradient)
+        xbestright = right_closest_line
+    return xbestleft, xbestright
+
+def draw_bestgaris_on_image(image, bestgaris, scale=1, thick=1):
+    x1 = bestgaris[0][0]
+    y1 = bestgaris[0][1]
+    x2 = bestgaris[1][0]
+    y2 = bestgaris[1][1]
+    print(bestgaris)
+    cv2.line(image,(int(x1)*scale,int(y1)*scale),(int(x2)*scale,int(y2)*scale),(255,50,255),thick)
+    return image
+
+def find_intersection_points_from_line(line1, line2):
+    x1, y1 = line1[0]
+    x2, y2 = line1[1]
+    x3, y3 = line2[0]
+    x4, y4 = line2[1]
+    denominator = ((x1 - x2) * (y3 - y4)) - ((y1 - y2) * (x3 - x4))
+    if denominator != 0:
+      x = (((x1 * y2 - y1 * x2) * (x3 - x4)) - ((x1 - x2) * (x3 * y4 - y3 * x4))) / denominator
+      y = (((x1 * y2 - y1 * x2) * (y3 - y4)) - ((y1 - y2) * (x3 * y4 - y3 * x4))) / denominator
+
+      return [x, y]
+
+    return None
+
+def find_best(carte_left_filtered, carte_right_filtered, carte_top_filtered, carte_bot_filtered):
+    best_kiri_atas = find_intersection_points_from_line(carte_top_filtered, carte_left_filtered)
+    best_kiri_bawah = find_intersection_points_from_line(carte_bot_filtered, carte_left_filtered)
+    best_kanan_atas = find_intersection_points_from_line(carte_top_filtered, carte_right_filtered)
+    best_kanan_bawah = find_intersection_points_from_line(carte_bot_filtered, carte_right_filtered)
+    return best_kiri_atas, best_kiri_bawah, best_kanan_atas, best_kanan_bawah
+
+def showhasil( orig_img, best_kiri_atas, best_kiri_bawah, best_kanan_atas, best_kanan_bawah):
     imgres = cv2.resize(orig_img,None,fx=0.1, fy=0.1, interpolation = cv2.INTER_CUBIC)
 
-    best_kiri_atas = CropLuar.timesten(best_kiri_atas)
-    best_kiri_bawah = CropLuar.timesten(best_kiri_bawah)
-    best_kanan_atas = CropLuar.timesten(best_kanan_atas)
-    best_kanan_bawah = CropLuar.timesten(best_kanan_bawah)
+    cv2.line(imgres,(int(best_kiri_atas[0]),int(best_kiri_atas[1])),(int(best_kiri_bawah[0]),int(best_kiri_bawah[1])),(255, 0, 0), 1)
+    cv2.line(imgres,(int(best_kiri_bawah[0]),int(best_kiri_bawah[1])),(int(best_kanan_bawah[0]),int(best_kanan_bawah[1])),(255, 0, 0), 1)
+    cv2.line(imgres,(int(best_kanan_bawah[0]),int(best_kanan_bawah[1])),(int(best_kanan_atas[0]),int(best_kanan_atas[1])),(255, 0, 0), 1)
+    cv2.line(imgres,(int(best_kanan_atas[0]),int(best_kanan_atas[1])),(int(best_kiri_atas[0]),int(best_kiri_atas[1])),(255, 0, 0), 1)
+    return imgres
 
+def timesten(best_point):
+    return best_point[0]*10, best_point[1]*10
+
+def show_real_size(orig_img, best_kiri_atas, best_kiri_bawah, best_kanan_atas, best_kanan_bawah):
     points = [tuple(best_kiri_atas), tuple(best_kanan_atas), tuple(best_kanan_bawah), tuple(best_kiri_bawah)]
-    output_image = CropLuar.crop_and_skew(orig_img.copy(), points)
+    output_image = crop_and_skew(orig_img.copy(), points)
     return output_image
+
+def crop_main(path_image):
+    img = path_image
+    orig_img = img.copy()
+    resized_img = resize(img)
+    l_channel, a_channel, b_channel = convert_to_lab(resized_img)
+    img_l = closing_l(l_channel)
+    img_a = erosion_a(a_channel)
+    img_b = b_channel
+    imgra, imgra_l, imgra_a, imgra_b = sumlab(img_l, img_a, img_b)
+    thresh = thresh_image(imgra)
+    marker = setmarker(thresh)
+    imws, imgra = watershed_image(marker, imgra)
+    imws8 = convert_watershed_uint8(imws)
+    hough_image, lines = hough(resized_img, imws8)
+    verticalLines, horizontalLines = calc_energy(imws8, lines)
+    drawed_img = draw_all(resized_img, verticalLines, horizontalLines)
+    # tampilkan drawed image
+    carte_vert = polar_dot_to_cartesian_line(verticalLines)
+    carte_horiz = polar_dot_to_cartesian_line(horizontalLines)
+    carte_vert_filtered = convert_lines_in_image(carte_vert, resized_img)
+    carte_horiz_filtered = convert_lines_in_image(carte_horiz, resized_img)
+    carte_left, carte_right = vertical_divider(carte_vert_filtered)
+    carte_left, carte_right = handle_left_right(carte_left, carte_right, resized_img)
+    carte_top, carte_bot = horizontal_divider(carte_horiz_filtered)
+    carte_top, carte_bot = handle_top_bot(carte_top, carte_bot, resized_img)
+    drawed_img_lrtb = draw_rl_tb(carte_left, carte_right, carte_top, carte_bot, orig_img)
+    # tampilkan drawed image
+    top_min_gradient, top_max_gradient, top_avg_gradient, top_closest_line, top_gradient_difference, top_gradients = find_gradient_difference(carte_top)
+    bot_min_gradient, bot_max_gradient, bot_avg_gradient, bot_closest_line, bot_gradient_difference, bot_gradients = find_gradient_difference(carte_bot)
+    xbesttop, xbestbot = handle_tb_gradient_diff(top_gradient_difference, bot_gradient_difference, top_avg_gradient, bot_avg_gradient, top_closest_line, bot_closest_line, carte_top, carte_bot)
+    left_min_gradient, left_max_gradient, left_avg_gradient, left_closest_line, left_gradient_difference, left_gradients = find_gradient_difference(carte_left)
+    right_min_gradient, right_max_gradient, right_avg_gradient, right_closest_line, right_gradient_difference, right_gradients = find_gradient_difference(carte_right)
+    xbestleft, xbestright = handle_lr_gradient_diff(left_gradient_difference, right_gradient_difference, left_avg_gradient, right_avg_gradient, left_closest_line, right_closest_line, carte_left, carte_right)
+    best_kiri_atas, best_kiri_bawah, best_kanan_atas, best_kanan_bawah = find_best(xbestleft, xbestright, xbesttop, xbestbot)
+    imgres = showhasil(orig_img, best_kiri_atas, best_kiri_bawah, best_kanan_atas, best_kanan_bawah)
+    # tampikan hasil
+    # dikali 10 dlu
+    best_kiri_atas_real = timesten(best_kiri_atas)
+    best_kiri_bawah_real = timesten(best_kiri_bawah)
+    best_kanan_atas_real = timesten(best_kanan_atas)
+    best_kanan_bawah_real = timesten(best_kanan_bawah)
+    real = show_real_size(orig_img, best_kiri_atas_real, best_kiri_bawah_real, best_kanan_atas_real, best_kanan_bawah_real)
+    # tampilkan real
