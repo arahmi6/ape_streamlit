@@ -622,6 +622,7 @@ def crop_main(path_image, cara = 0): #cara 0 = crop berdasaar gradien, 1 = berda
     elif cara == 1:
         carte_top, carte_bot = handle_top_bot_2(carte_top, carte_bot, resized_img)
     drawed_img_lrtb = draw_rl_tb(carte_left, carte_right, carte_top, carte_bot, resized_img)
+    
     if cara == 0:
         top_min_gradient, top_max_gradient, top_avg_gradient, top_closest_line, top_gradient_difference, top_gradients = find_gradient_difference(carte_top)
         bot_min_gradient, bot_max_gradient, bot_avg_gradient, bot_closest_line, bot_gradient_difference, bot_gradients = find_gradient_difference(carte_bot)
@@ -631,10 +632,10 @@ def crop_main(path_image, cara = 0): #cara 0 = crop berdasaar gradien, 1 = berda
         xbestleft, xbestright = handle_lr_gradient_diff(left_gradient_difference, right_gradient_difference, left_avg_gradient, right_avg_gradient, left_closest_line, right_closest_line, carte_left, carte_right)
         best_kiri_atas, best_kiri_bawah, best_kanan_atas, best_kanan_bawah = find_best(xbestleft, xbestright, xbesttop, xbestbot)
     elif cara == 1:
-        carte_top_filtered, titik_potong = find_line_by_intersection_points(carte_top, carte_vert_filtered, img.shape[0], img.shape[1], True, False)
-        carte_bot_filtered, titik_potong = find_line_by_intersection_points(carte_bot, carte_vert_filtered, img.shape[0], img.shape[1], False, False)
-        carte_left_filtered, titik_potong = find_line_by_intersection_points(carte_left, carte_horiz_filtered, img.shape[0], img.shape[1], True, True)
-        carte_right_filtered, titik_potong = find_line_by_intersection_points(carte_right, carte_horiz_filtered, img.shape[0], img.shape[1], False, True)
+        carte_top_filtered, titik_potong = find_intersection_points_from_line(carte_top, carte_vert_filtered, img.shape[0], img.shape[1], True, False)
+        carte_bot_filtered, titik_potong = find_intersection_points_from_line(carte_bot, carte_vert_filtered, img.shape[0], img.shape[1], False, False)
+        carte_left_filtered, titik_potong = find_intersection_points_from_line(carte_left, carte_horiz_filtered, img.shape[0], img.shape[1], True, True)
+        carte_right_filtered, titik_potong = find_intersection_points_from_line(carte_right, carte_horiz_filtered, img.shape[0], img.shape[1], False, True)
         best_kiri_atas = find_intersection_points_from_line(carte_top_filtered, carte_left_filtered)
         best_kiri_bawah = find_intersection_points_from_line(carte_bot_filtered, carte_left_filtered)
         best_kanan_atas = find_intersection_points_from_line(carte_top_filtered, carte_right_filtered)
