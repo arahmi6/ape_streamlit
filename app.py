@@ -183,12 +183,19 @@ def upload_image():
       st.write('PSNR:', psnr)
 
       st.subheader('4. Jaccard Similarity Index')
-      img = cv.imread('/content/temp.jpg',2)
+      jacc1, jacc2 = st.columns(2)
       pytesseract.pytesseract.tesseract_cmd = r'C:/Program Files/Tesseract-OCR/tesseract.exe'
-      ret, bw_img = cv.threshold(img2_asli,230,255,cv.THRESH_BINARY)
       custom_config=r'''--oem 3 --psm 4 -c tessedit_char_whitelist="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ .-,/\ 0123456789"'''
-      text = pytesseract.image_to_string(bw_img,config=custom_config)
-      st.write(text)
+
+      ret, bw_asli = cv.threshold(img2_asli,230,255,cv.THRESH_BINARY)
+      text_asli = pytesseract.image_to_string(bw_asli,config=custom_config)
+      jacc1.text("Expected")
+      jacc1.write(text_asli)
+
+      ret, bw_pred = cv.threshold(img2_prediksi,230,255,cv.THRESH_BINARY)
+      text_pred = pytesseract.image_to_string(bw_pred,config=custom_config)
+      jacc2.text("Resulted")
+      jacc2.write(text_pred)
   else:
     st.write(" Please upload the image first! 😄")
 
