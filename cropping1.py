@@ -129,19 +129,13 @@ def calc_energy(imws8, lines):
   horizontalLines.sort(key=takeThird)
   for y in verticalLines[:10]:
     angle_deg = np.degrees(y[1])  # Konversi kemiringan garis ke derajat
-    # print("Vert", angle_deg)
     if (angle_deg <= 10 and angle_deg >= -10) or (angle_deg <= 190 and angle_deg >= 170):
-    #   print("In", y)
       retvalvert.append(y)
   
   for z in horizontalLines[:10]:
     angle_deg = np.degrees(z[1])  # Konversi kemiringan garis ke derajat
-    # print("Horiz", angle_deg)
     if (angle_deg >= 80 and angle_deg <= 100) or (angle_deg >= 260 and angle_deg <= 280):
-    #   print("In", z)
       retvalhor.append(z)
-#   print("Retvalvert", retvalvert)
-#   print("Retvalhor", retvalhor)
   return retvalvert, retvalhor
 
 def draw(imIn, candidateLines, color=(255,0,0), scale_factor=1, thick=1, length=1000):
@@ -423,14 +417,10 @@ def cari_garis_terdekat(array, gradien):
     for garis in array:
         x1, y1 = garis[0]
         x2, y2 = garis[1]
-        print(garis)
         # Menghindari pembagian oleh nol
-        print(x2, x1)
         if x2 - x1 != 0:
             gradien_garis = (y2 - y1) / (x2 - x1)
-            # print(garis, gradien_garis)
             selisih = abs(gradien_garis - gradien)
-            print("Selisih", selisih)
             if selisih <= selisih_terkecil:
                 selisih_terkecil = selisih
                 garis_terdekat = garis
@@ -460,7 +450,6 @@ def draw_bestgaris_on_image(image, bestgaris, scale=1, thick=1):
     y1 = bestgaris[0][1]
     x2 = bestgaris[1][0]
     y2 = bestgaris[1][1]
-    print(bestgaris)
     cv2.line(image,(int(x1)*scale,int(y1)*scale),(int(x2)*scale,int(y2)*scale),(255,50,255),thick)
     return image
 
@@ -493,6 +482,23 @@ def showhasil( orig_img, best_kiri_atas, best_kiri_bawah, best_kanan_atas, best_
     cv2.line(imgres,(int(best_kanan_bawah[0]),int(best_kanan_bawah[1])),(int(best_kanan_atas[0]),int(best_kanan_atas[1])),(255, 0, 0), 1)
     cv2.line(imgres,(int(best_kanan_atas[0]),int(best_kanan_atas[1])),(int(best_kiri_atas[0]),int(best_kiri_atas[1])),(255, 0, 0), 1)
     return imgres
+
+def same_orientation(best_kiri_atas_real, best_kiri_bawah_real, best_kanan_atas_real, best_kanan_bawah_real, img):
+    curr_res_rot = -1
+    img_rot = -1
+    if(abs(best_kiri_atas_real[1] - best_kiri_bawah_real[1]) < abs(best_kiri_atas_real[0] - best_kanan_atas_real[0])):
+        curr_res_rot = 0 #portrait 
+    else:
+        curr_res_rot = 1 #landscape
+    
+    if(img.shape[0] < img.shape[1]):
+        img_rot = 0 #portrait
+    else:
+        img_rot = 1 #landscape
+    if(curr_res_rot == img_rot):
+        return 1 #same orientation
+    else:
+        return 0 #different orientation
 
 def timesten(best_point):
     return best_point[0]*10, best_point[1]*10
@@ -543,6 +549,9 @@ def crop_main(path_image):
     best_kiri_bawah_real = timesten(best_kiri_bawah)
     best_kanan_atas_real = timesten(best_kanan_atas)
     best_kanan_bawah_real = timesten(best_kanan_bawah)
-    real = show_real_size(orig_img, best_kiri_atas_real, best_kiri_bawah_real, best_kanan_atas_real, best_kanan_bawah_real)
+    if(same_orientation(best_kiri_atas_real, best_kiri_bawah_real, best_kanan_atas_real, best_kanan_bawah_real, img)):
+        real = show_real_size(orig_img, best_kiri_atas_real, best_kiri_bawah_real, best_kanan_atas_real, best_kanan_bawah_real)
+    else:
+        real = orig_img.copy()
     # tampilkan real
     return  hough_image, drawed_img, drawed_img_lrtb, imgres, real
