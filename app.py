@@ -54,11 +54,20 @@ def upload_image():
     cvImg = cv.cvtColor(arrImg, cv.COLOR_RGB2BGR)
 
     # proses crop
-    hough_image,drawed_img, drawed_img_lrtb, imgres, real = cr.crop_main(cvImg)
-    colcrop1, colcrop2, colcrop3 = st.columns(3)
-    colcrop1.image(drawed_img, caption = 'All Line')
-    colcrop2.image(drawed_img_lrtb, caption = 'Divided Line')
-    colcrop3.image(imgres, caption = 'Before Cropping')
+    algo = st.radio(
+    "Select Algorithm",
+    ('Select line by its gradient', 'Select line by intersection points'))
+
+    if algo == 'Select line by its gradient':
+        hough_image,drawed_img, drawed_img_lrtb, imgres, real = cr.crop_main(cvImg, 0)
+    elif algo == 'Select line by intersection points':
+        hough_image,drawed_img, drawed_img_lrtb, imgres, real = cr.crop_main(cvImg, 1)
+    
+    colcrop1, colcrop2, colcrop3, colcrop4 = st.columns(4)
+    colcrop1.image(hough_image, caption = 'Hough Line')
+    colcrop2.image(drawed_img, caption = 'All Line')
+    colcrop3.image(drawed_img_lrtb, caption = 'Divided Line')
+    colcrop4.image(imgres, caption = 'Before Cropping')
     st.image(real, caption = 'After Cropping')
     path1 = cvToImage(real)
     st.text(Image.open(path1).size)
