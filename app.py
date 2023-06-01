@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 import cv2 as cv
+import jaccard as jc
 import pytesseract
 
 from tensorflow import keras
@@ -205,6 +206,10 @@ def upload_image():
       text_pred = pytesseract.image_to_string(bw_pred,config=custom_config)
       jacc2.text("Resulted")
       jacc2.write(text_pred)
+
+      calculate = jc.Jaccard_Similarity(text_asli, text_pred)
+      st.write("Accuracy Jaccard:", calculate)
+
   else:
     st.write(" Please upload the image first! 😄")
 
