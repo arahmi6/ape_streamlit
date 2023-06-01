@@ -57,11 +57,14 @@ def upload_image():
     cvImg = cv.cvtColor(arrImg, cv.COLOR_RGB2BGR)
 
     # proses crop
-    crop_image = cr.crop_main(cvImg)
-    #crop_image = cvImg
-
-    path1 = cvToImage(crop_image)
-    st.image(Image.open(path1))
+    hough_image,drawed_img, drawed_img_lrtb, imgres, real = cr.crop_main(cvImg)
+    colcrop1, colcrop2, colcrop3 = st.columns(3)
+    colcrop1.image(drawed_img, caption = 'All Line')
+    colcrop2.image(drawed_img_lrtb, caption = 'Divided Line')
+    colcrop3.image(imgres, caption = 'Before Cropping')
+    st.image(real, caption = 'After Cropping')
+    path1 = cvToImage(real)
+    # st.image(Image.open(path1))
     st.text(Image.open(path1).size)
   else:
     st.write("!!!Please upload an image!!!")
@@ -70,7 +73,7 @@ def upload_image():
   st.header('Step 3: Deskewing image')
 
   if path1 != None:
-    angle, deskew_image = dsk.correct_skew(crop_image, 0.01, 10, 0.1)
+    angle, deskew_image = dsk.correct_skew(real, 0.01, 10, 0.1)
     path2 = cvToImage(deskew_image)
     st.write("Best Angle: ", angle)
     st.image(path2)

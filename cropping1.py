@@ -124,11 +124,9 @@ def calc_energy(imws8, lines):
           verticalLines.append(x)
 
   retvalvert = []
-  retvalhor = []
-  
+  retvalhor = []  
   verticalLines.sort(key=takeThird)
   horizontalLines.sort(key=takeThird)
-
   for y in verticalLines[:10]:
     angle_deg = np.degrees(y[1])  # Konversi kemiringan garis ke derajat
     # print("Vert", angle_deg)
@@ -255,7 +253,7 @@ def convert_lines_in_image(carte_lines, img):
 
     x = img.shape[1]
     temp_res1 = [x, interpolate_y(carte_line, x)]
-    if(verify_temp_res(temp_res1)):
+    if(verify_temp_res(temp_res1, img)):
       if(dotone==[]):
         dotone = temp_res1
       elif(dottwo==[]):
@@ -263,7 +261,7 @@ def convert_lines_in_image(carte_lines, img):
     
     x = 0
     temp_res2 = [x, interpolate_y(carte_line, x)]
-    if(verify_temp_res(temp_res2)):
+    if(verify_temp_res(temp_res2, img)):
       if(dotone==[]):
         dotone = temp_res2
       elif(dottwo==[]):
@@ -271,7 +269,7 @@ def convert_lines_in_image(carte_lines, img):
     
     y = img.shape[0]
     temp_res3 = [interpolate_x(carte_line, y), y]
-    if(verify_temp_res(temp_res3)):
+    if(verify_temp_res(temp_res3, img)):
       if(dotone==[]):
         dotone = temp_res3
       elif(dottwo==[]):
@@ -279,7 +277,7 @@ def convert_lines_in_image(carte_lines, img):
     
     y = 0
     temp_res4 = [interpolate_x(carte_line, y), y]
-    if(verify_temp_res(temp_res4)):
+    if(verify_temp_res(temp_res4, img)):
       if(dotone==[]):
         dotone = temp_res4
       elif(dottwo==[]):
@@ -508,14 +506,14 @@ def crop_main(path_image):
     img = path_image
     orig_img = img.copy()
     resized_img = resize(img)
-    l_channel, a_channel, b_channel = convert_to_lab(resized_img)
+    l_channel, a_channel, b_channel, _ = convert_to_lab(resized_img)
     img_l = closing_l(l_channel)
     img_a = erosion_a(a_channel)
     img_b = b_channel
     imgra, imgra_l, imgra_a, imgra_b = sumlab(img_l, img_a, img_b)
     thresh = thresh_image(imgra)
     marker = setmarker(thresh)
-    imws, imgra = watershed_image(marker, imgra)
+    imws, imgra = watershed_image(imgra_l,imgra_a,imgra_b,marker)
     imws8 = convert_watershed_uint8(imws)
     hough_image, lines = hough(resized_img, imws8)
     verticalLines, horizontalLines = calc_energy(imws8, lines)
@@ -525,9 +523,9 @@ def crop_main(path_image):
     carte_horiz = polar_dot_to_cartesian_line(horizontalLines)
     carte_vert_filtered = convert_lines_in_image(carte_vert, resized_img)
     carte_horiz_filtered = convert_lines_in_image(carte_horiz, resized_img)
-    carte_left, carte_right = vertical_divider(carte_vert_filtered)
+    carte_left, carte_right = vertical_divider(carte_vert_filtered, resized_img)
     carte_left, carte_right = handle_left_right(carte_left, carte_right, resized_img)
-    carte_top, carte_bot = horizontal_divider(carte_horiz_filtered)
+    carte_top, carte_bot = horizontal_divider(carte_horiz_filtered, resized_img)
     carte_top, carte_bot = handle_top_bot(carte_top, carte_bot, resized_img)
     drawed_img_lrtb = draw_rl_tb(carte_left, carte_right, carte_top, carte_bot, orig_img)
     # tampilkan drawed image
@@ -547,3 +545,4 @@ def crop_main(path_image):
     best_kanan_bawah_real = timesten(best_kanan_bawah)
     real = show_real_size(orig_img, best_kiri_atas_real, best_kiri_bawah_real, best_kanan_atas_real, best_kanan_bawah_real)
     # tampilkan real
+    return  hough_image, drawed_img, drawed_img_lrtb, imgres, real
