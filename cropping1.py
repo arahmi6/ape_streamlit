@@ -129,19 +129,13 @@ def calc_energy(imws8, lines):
   horizontalLines.sort(key=takeThird)
   for y in verticalLines[:10]:
     angle_deg = np.degrees(y[1])  # Konversi kemiringan garis ke derajat
-    # print("Vert", angle_deg)
     if (angle_deg <= 10 and angle_deg >= -10) or (angle_deg <= 190 and angle_deg >= 170):
-    #   print("In", y)
       retvalvert.append(y)
   
   for z in horizontalLines[:10]:
     angle_deg = np.degrees(z[1])  # Konversi kemiringan garis ke derajat
-    # print("Horiz", angle_deg)
     if (angle_deg >= 80 and angle_deg <= 100) or (angle_deg >= 260 and angle_deg <= 280):
-    #   print("In", z)
       retvalhor.append(z)
-#   print("Retvalvert", retvalvert)
-#   print("Retvalhor", retvalhor)
   return retvalvert, retvalhor
 
 def draw(imIn, candidateLines, color=(255,0,0), scale_factor=1, thick=1, length=1000):
@@ -423,14 +417,11 @@ def cari_garis_terdekat(array, gradien):
     for garis in array:
         x1, y1 = garis[0]
         x2, y2 = garis[1]
-        print(garis)
+
         # Menghindari pembagian oleh nol
-        print(x2, x1)
         if x2 - x1 != 0:
             gradien_garis = (y2 - y1) / (x2 - x1)
-            # print(garis, gradien_garis)
             selisih = abs(gradien_garis - gradien)
-            print("Selisih", selisih)
             if selisih <= selisih_terkecil:
                 selisih_terkecil = selisih
                 garis_terdekat = garis
