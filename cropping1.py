@@ -441,6 +441,84 @@ def find_line_by_intersection_points(lines1, lines2, h, w, toZero = True, vertic
       retval = same_max_intersections[-1]
     return retval, intersection_points
 
+def find_line_by_intersection_points_terdalam(lines1, lines2, h, w, toZero = True, vertical = True):
+    intersection_points = []
+    max_intersections = 0
+    same_max_intersections = []
+    retval = None
+    count_max_intersections = 0
+    for line1 in lines1:
+        intersections = 0
+
+        for line2 in lines2:
+            x1, y1 = line1[0]
+            x2, y2 = line1[1]
+            x3, y3 = line2[0]
+            x4, y4 = line2[1]
+
+            denominator = ((x1 - x2) * (y3 - y4)) - ((y1 - y2) * (x3 - x4))
+
+            if denominator != 0:
+                x = (((x1 * y2 - y1 * x2) * (x3 - x4)) - ((x1 - x2) * (x3 * y4 - y3 * x4))) / denominator
+                y = (((x1 * y2 - y1 * x2) * (y3 - y4)) - ((y1 - y2) * (x3 * y4 - y3 * x4))) / denominator
+                if(((x <= w) and (x >= 0)) and ((y <= h) and (y >= 0))):
+                  intersection_points.append([x, y])
+                  intersections += 1
+        if intersections > max_intersections:
+          max_intersections = intersections
+          same_max_intersections = []
+          count_max_intersections = 0
+        if intersections == max_intersections:
+          count_max_intersections += 1
+          same_max_intersections.append(line1)
+    
+    if(vertical):
+      same_max_intersections.sort(key=takeX)
+    else:
+      same_max_intersections.sort(key=takeY)
+
+    if(toZero):
+      retval = same_max_intersections[-1]
+    else:
+      retval = same_max_intersections[0]
+    return retval, intersection_points
+
+def find_line_by_intersection_points_energy(lines1, lines2, h, w, toZero = True, vertical = True):
+    intersection_points = []
+    max_intersections = 0
+    same_max_intersections = []
+    count_max_intersections = 0
+    for line1 in lines1:
+        intersections = 0
+
+        for line2 in lines2:
+            x1, y1 = line1[0]
+            x2, y2 = line1[1]
+            x3, y3 = line2[0]
+            x4, y4 = line2[1]
+
+            denominator = ((x1 - x2) * (y3 - y4)) - ((y1 - y2) * (x3 - x4))
+
+            if denominator != 0:
+                x = (((x1 * y2 - y1 * x2) * (x3 - x4)) - ((x1 - x2) * (x3 * y4 - y3 * x4))) / denominator
+                y = (((x1 * y2 - y1 * x2) * (y3 - y4)) - ((y1 - y2) * (x3 * y4 - y3 * x4))) / denominator
+                if(((x <= w) and (x >= 0)) and ((y <= h) and (y >= 0))):
+                  intersection_points.append([x, y])
+                  intersections += 1
+        if intersections > max_intersections:
+          max_intersections = intersections
+          same_max_intersections = []
+          count_max_intersections = 0
+        if intersections == max_intersections:
+          count_max_intersections += 1
+          same_max_intersections.append(line1)
+    
+    if(vertical):
+      same_max_intersections.sort(key=takeX)
+    else:
+      same_max_intersections.sort(key=takeY)
+    return same_max_intersections[0], intersection_points
+
 def draws(imIn, candidateLines, color=(255,0,0), scale_factor=1, thick=1, length=1000):
     for rho, theta in candidateLines:
         a = np.cos(theta)
@@ -589,7 +667,11 @@ def show_real_size(orig_img, best_kiri_atas, best_kiri_bawah, best_kanan_atas, b
     output_image = crop_and_skew(orig_img.copy(), points)
     return output_image
 
-def crop_main(path_image, cara = 0): #cara 0 = crop berdasaar gradien, 1 = berdasar banyaknya garis yg berpotongan (terluar), 2 = berdasar banyaknya garis yg berpotongan (terdalam)
+def crop_main(path_image, cara = 0): 
+    # 0 = crop berdasar gradien
+    # 1 = crop berdasar banyaknya garis yg berpotongan (terluar), 
+    # 2 = crop berdasar banyaknya garis yg berpotongan (terdalam),
+    # 3 = crop berdasar energy terkecil 
     img = path_image
     orig_img = img.copy()
     resized_img = resize(img)
@@ -605,7 +687,7 @@ def crop_main(path_image, cara = 0): #cara 0 = crop berdasaar gradien, 1 = berda
     hough_image, lines = hough(resized_img, imws8)
     if cara == 0:
         verticalLines, horizontalLines = calc_energy(imws8, lines)
-    elif cara == 1:
+    elif cara == 1 or cara == 2 or cara == 3:
         verticalLines, horizontalLines = divide_line_to_horizontal_and_vertical(imws8, lines)
     drawed_img = draw_all(resized_img, verticalLines, horizontalLines)
     carte_vert = polar_dot_to_cartesian_line(verticalLines)
@@ -615,12 +697,12 @@ def crop_main(path_image, cara = 0): #cara 0 = crop berdasaar gradien, 1 = berda
     carte_left, carte_right = vertical_divider(carte_vert_filtered, resized_img)
     if cara == 0:
         carte_left, carte_right = handle_left_right(carte_left, carte_right, resized_img)
-    elif cara == 1:
+    elif cara == 1 or cara == 2 or cara == 3:
         carte_left, carte_right = handle_left_right_2(carte_left, carte_right, resized_img)
     carte_top, carte_bot = horizontal_divider(carte_horiz_filtered, resized_img)
     if cara == 0:
         carte_top, carte_bot = handle_top_bot(carte_top, carte_bot, resized_img)
-    elif cara == 1:
+    elif cara == 1 or cara == 2 or cara == 3:
         carte_top, carte_bot = handle_top_bot_2(carte_top, carte_bot, resized_img)
     drawed_img_lrtb = draw_rl_tb(carte_left, carte_right, carte_top, carte_bot, resized_img)
     if cara == 0:
@@ -631,11 +713,22 @@ def crop_main(path_image, cara = 0): #cara 0 = crop berdasaar gradien, 1 = berda
         right_min_gradient, right_max_gradient, right_avg_gradient, right_closest_line, right_gradient_difference, right_gradients = find_gradient_difference(carte_right)
         xbestleft, xbestright = handle_lr_gradient_diff(left_gradient_difference, right_gradient_difference, left_avg_gradient, right_avg_gradient, left_closest_line, right_closest_line, carte_left, carte_right)
         best_kiri_atas, best_kiri_bawah, best_kanan_atas, best_kanan_bawah = find_best(xbestleft, xbestright, xbesttop, xbestbot)
-    elif cara == 1:
-        carte_top_filtered, titik_potong = find_line_by_intersection_points(carte_top, carte_vert_filtered, img.shape[0], img.shape[1], True, False)
-        carte_bot_filtered, titik_potong = find_line_by_intersection_points(carte_bot, carte_vert_filtered, img.shape[0], img.shape[1], False, False)
-        carte_left_filtered, titik_potong = find_line_by_intersection_points(carte_left, carte_horiz_filtered, img.shape[0], img.shape[1], True, True)
-        carte_right_filtered, titik_potong = find_line_by_intersection_points(carte_right, carte_horiz_filtered, img.shape[0], img.shape[1], False, True)
+    elif cara == 1 or cara == 2 or cara == 3:
+        if cara == 1:
+            carte_top_filtered, titik_potong = find_line_by_intersection_points(carte_top, carte_vert_filtered, img.shape[0], img.shape[1], True, False)
+            carte_bot_filtered, titik_potong = find_line_by_intersection_points(carte_bot, carte_vert_filtered, img.shape[0], img.shape[1], False, False)
+            carte_left_filtered, titik_potong = find_line_by_intersection_points(carte_left, carte_horiz_filtered, img.shape[0], img.shape[1], True, True)
+            carte_right_filtered, titik_potong = find_line_by_intersection_points(carte_right, carte_horiz_filtered, img.shape[0], img.shape[1], False, True)
+        elif cara == 2:
+            carte_top_filtered, titik_potong = find_line_by_intersection_points_terdalam(carte_top, carte_vert_filtered, img.shape[0], img.shape[1], True, False)
+            carte_bot_filtered, titik_potong = find_line_by_intersection_points_terdalam(carte_bot, carte_vert_filtered, img.shape[0], img.shape[1], False, False)
+            carte_left_filtered, titik_potong = find_line_by_intersection_points_terdalam(carte_left, carte_horiz_filtered, img.shape[0], img.shape[1], True, True)
+            carte_right_filtered, titik_potong = find_line_by_intersection_points_terdalam(carte_right, carte_horiz_filtered, img.shape[0], img.shape[1], False, True)
+        elif cara == 3:
+            carte_top_filtered, titik_potong = find_line_by_intersection_points_energy(carte_top, carte_vert_filtered, img.shape[0], img.shape[1], True, False)
+            carte_bot_filtered, titik_potong = find_line_by_intersection_points_energy(carte_bot, carte_vert_filtered, img.shape[0], img.shape[1], False, False)
+            carte_left_filtered, titik_potong = find_line_by_intersection_points_energy(carte_left, carte_horiz_filtered, img.shape[0], img.shape[1], True, True)
+            carte_right_filtered, titik_potong = find_line_by_intersection_points_energy(carte_right, carte_horiz_filtered, img.shape[0], img.shape[1], False, True)
         best_kiri_atas = find_intersection_points_from_line(carte_top_filtered, carte_left_filtered)
         best_kiri_bawah = find_intersection_points_from_line(carte_bot_filtered, carte_left_filtered)
         best_kanan_atas = find_intersection_points_from_line(carte_top_filtered, carte_right_filtered)

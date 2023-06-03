@@ -57,13 +57,20 @@ def upload_image():
     # proses crop
     algo = st.radio(
     "Select Algorithm",
-    ('Select line by its gradient', 'Select line by intersection points (Outermost)'))
+    ('Select line by its gradient', 'Select line by intersection points (Outermost)', 'Select line by intersection points (Innermost)', 
+     'Select line by intersection points (Energy)'))
 
     if algo == 'Select line by its gradient':
         hough_image,drawed_img, drawed_img_lrtb, imgres, real = cr.crop_main(cvImg, 0)
     elif algo == 'Select line by intersection points (Outermost)':
         _,_,_,_, real = cr.crop_main(cvImg, 1)
         hough_image,drawed_img, drawed_img_lrtb, imgres, real = cr.crop_main(real, 1)
+    elif algo == 'Select line by intersection points (Innermost)':
+        _,_,_,_, real = cr.crop_main(cvImg, 1)
+        hough_image,drawed_img, drawed_img_lrtb, imgres, real = cr.crop_main(real, 2)
+    elif algo == 'Select line by intersection points (Energy)':
+        _,_,_,_, real = cr.crop_main(cvImg, 1)
+        hough_image,drawed_img, drawed_img_lrtb, imgres, real = cr.crop_main(real, 3)
     
     colcrop1, colcrop2, colcrop3, colcrop4 = st.columns(4)
     colcrop1.image(hough_image, caption = 'Hough Line')
