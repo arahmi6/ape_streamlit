@@ -57,12 +57,13 @@ def upload_image():
     # proses crop
     algo = st.radio(
     "Select Algorithm",
-    ('Select line by its gradient', 'Select line by intersection points'))
+    ('Select line by its gradient', 'Select line by intersection points (Outermost)'))
 
     if algo == 'Select line by its gradient':
         hough_image,drawed_img, drawed_img_lrtb, imgres, real = cr.crop_main(cvImg, 0)
-    elif algo == 'Select line by intersection points':
-        hough_image,drawed_img, drawed_img_lrtb, imgres, real = cr.crop_main(cvImg, 1)
+    elif algo == 'Select line by intersection points (Outermost)':
+        _,_,_,_, real = cr.crop_main(cvImg, 1)
+        hough_image,drawed_img, drawed_img_lrtb, imgres, real = cr.crop_main(real, 1)
     
     colcrop1, colcrop2, colcrop3, colcrop4 = st.columns(4)
     colcrop1.image(hough_image, caption = 'Hough Line')
@@ -79,8 +80,8 @@ def upload_image():
   st.header('Step 3: Deskewing image')
 
   if path1 != None:
-    delta = st.number_input('Insert a delta')
-    resize = st.number_input('Insert a resize')
+    delta = st.number_input('Insert a delta', min_value=0.01, max_value=1.0, value=0.1)
+    resize = st.number_input('Insert a resize', min_value=0.01, max_value=1.0, value=0.1)
     if delta != 0 and resize != 0:
       angle, deskew_image = dsk.correct_skew(real, delta, 10, resize)
       path2 = cvToImage(deskew_image)

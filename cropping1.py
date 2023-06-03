@@ -64,7 +64,8 @@ def convert_watershed_uint8(imws):
 def hough(img, imws8):
     imgcopy = img.copy()
     lines = cv2.HoughLines(imws8,1,np.pi/180,10)
-
+    if lines is None:
+       return imgcopy, [[(0.0, 0.0)]]
     for x in range(0,len(lines)):
         for rho,theta in lines[x]:
             a = np.cos(theta)
@@ -421,7 +422,6 @@ def find_line_by_intersection_points(lines1, lines2, h, w, toZero = True, vertic
                 if(((x <= w) and (x >= 0)) and ((y <= h) and (y >= 0))):
                   intersection_points.append([x, y])
                   intersections += 1
-        print(line1, line2, intersections)
         if intersections > max_intersections:
           max_intersections = intersections
           same_max_intersections = []
