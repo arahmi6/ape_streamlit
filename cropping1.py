@@ -659,10 +659,19 @@ def same_orientation(best_kiri_atas_real, best_kiri_bawah_real, best_kanan_atas_
     else:
         return 0 #different orientation
 
+def check_line_under_onefourth(img, best_kiri_atas_real, best_kiri_bawah_real, best_kanan_atas_real, best_kanan_bawah_real):
+    if(((best_kanan_atas_real[0] - best_kiri_atas_real[0]) <= (img.shape[1]/2)) or 
+       ((best_kanan_bawah_real[0] - best_kiri_bawah_real[0]) <= (img.shape[1]/2)) or
+       ((best_kiri_bawah_real[1] - best_kiri_atas_real[1]) <= (img.shape[0]/2)) or
+       ((best_kanan_bawah_real[1] - best_kanan_atas_real[1]) <= (img.shape[0]/2))):
+        return 1
+    else:
+        return 0
+
 def timesten(best_point):
     return best_point[0]*10, best_point[1]*10
 
-def show_real_size(orig_img, best_kiri_atas, best_kiri_bawah, best_kanan_atas, best_kanan_bawah):
+def show_cropped_and_skewed(orig_img, best_kiri_atas, best_kiri_bawah, best_kanan_atas, best_kanan_bawah):
     points = [tuple(best_kiri_atas), tuple(best_kanan_atas), tuple(best_kanan_bawah), tuple(best_kiri_bawah)]
     output_image = crop_and_skew(orig_img.copy(), points)
     return output_image
@@ -738,8 +747,8 @@ def crop_main(path_image, cara = 0):
     best_kiri_bawah_real = timesten(best_kiri_bawah)
     best_kanan_atas_real = timesten(best_kanan_atas)
     best_kanan_bawah_real = timesten(best_kanan_bawah)
-    if(same_orientation(best_kiri_atas_real, best_kiri_bawah_real, best_kanan_atas_real, best_kanan_bawah_real, img)):
-        real = show_real_size(orig_img, best_kiri_atas_real, best_kiri_bawah_real, best_kanan_atas_real, best_kanan_bawah_real)
-    else:
+    if(check_line_under_onefourth(img, best_kiri_atas_real, best_kiri_bawah_real, best_kanan_atas_real, best_kanan_bawah_real)):
         real = orig_img.copy()
+    else:
+        real = show_cropped_and_skewed(orig_img, best_kiri_atas_real, best_kiri_bawah_real, best_kanan_atas_real, best_kanan_bawah_real)
     return  hough_image, drawed_img, drawed_img_lrtb, imgres, real
