@@ -8,7 +8,7 @@ import pytesseract
 
 from tensorflow import keras
 from PIL import Image
-import cropping1 as cr
+import cropping as cr
 from deskewing import Deskew as dsk
 
 def intro():
