@@ -57,45 +57,62 @@ def upload_image():
     # proses crop
     algo = st.radio(
     "Select Algorithm",
-    ('Select line by its gradient', 'Select line by intersection points (Outermost)', 'Select line by intersection points (Innermost)', 
+    ('None',
+     'Select line by its gradient',
+     'Select line by intersection points (Outermost)',
+     'Select line by intersection points (Innermost)', 
      'Select line by intersection points (Energy)'))
 
-    if algo == 'Select line by its gradient':
-        hough_image,drawed_img, drawed_img_lrtb, imgres, real = cr.crop_main(cvImg, 0)
-    elif algo == 'Select line by intersection points (Outermost)':
-        _,_,_,_, real = cr.crop_main(cvImg, 1)
-        hough_image,drawed_img, drawed_img_lrtb, imgres, real = cr.crop_main(real, 1)
-    elif algo == 'Select line by intersection points (Innermost)':
-        _,_,_,_, real = cr.crop_main(cvImg, 1)
-        hough_image,drawed_img, drawed_img_lrtb, imgres, real = cr.crop_main(real, 2)
-    elif algo == 'Select line by intersection points (Energy)':
-        _,_,_,_, real = cr.crop_main(cvImg, 1)
-        hough_image,drawed_img, drawed_img_lrtb, imgres, real = cr.crop_main(real, 3)
-    
-    colcrop1, colcrop2, colcrop3, colcrop4 = st.columns(4)
-    colcrop1.image(hough_image, caption = 'Hough Line')
-    colcrop2.image(drawed_img, caption = 'All Line')
-    colcrop3.image(drawed_img_lrtb, caption = 'Divided Line')
-    colcrop4.image(imgres, caption = 'Before Cropping')
-    st.image(real, caption = 'After Cropping')
-    path1 = cvToImage(real)
-    st.text(Image.open(path1).size)
+    if algo == 'None':
+       st.image(cvImg, caption = 'Without Cropping')
+       real = cvImg
+       path1 = cvToImage(real)
+    else:
+      if algo == 'Select line by its gradient':
+          hough_image,drawed_img, drawed_img_lrtb, imgres, real = cr.crop_main(cvImg, 0)
+      elif algo == 'Select line by intersection points (Outermost)':
+          _,_,_,_, real = cr.crop_main(cvImg, 1)
+          hough_image,drawed_img, drawed_img_lrtb, imgres, real = cr.crop_main(real, 1)
+      elif algo == 'Select line by intersection points (Innermost)':
+          _,_,_,_, real = cr.crop_main(cvImg, 1)
+          hough_image,drawed_img, drawed_img_lrtb, imgres, real = cr.crop_main(real, 2)
+      elif algo == 'Select line by intersection points (Energy)':
+          _,_,_,_, real = cr.crop_main(cvImg, 1)
+          hough_image,drawed_img, drawed_img_lrtb, imgres, real = cr.crop_main(real, 3)
+      
+      colcrop1, colcrop2, colcrop3, colcrop4 = st.columns(4)
+      colcrop1.image(hough_image, caption = 'Hough Line')
+      colcrop2.image(drawed_img, caption = 'All Line')
+      colcrop3.image(drawed_img_lrtb, caption = 'Divided Line')
+      colcrop4.image(imgres, caption = 'Before Cropping')
+      st.image(real, caption = 'After Cropping')
+      path1 = cvToImage(real)
+      st.text(Image.open(path1).size)
   else:
-    st.write(" Please upload the image first! 😄")
+    st.write(" Please upload the image first!")
 
   # Deskewing ------------------------------
   st.header('Step 3: Deskewing image')
-
   if path1 != None:
-    delta = st.number_input('Insert a delta', min_value=0.01, max_value=1.0, value=0.1)
-    resize = st.number_input('Insert a resize', min_value=0.01, max_value=1.0, value=0.1)
-    if delta != 0 and resize != 0:
-      angle, deskew_image = dsk.correct_skew(real, delta, 10, resize)
+    skew = st.radio(
+        "Select Algorithm",
+        ('Without Deskewing',
+        'With Deskewing'))
+    
+    if skew == 'Without Deskewing':
+      deskew_image = real
       path2 = cvToImage(deskew_image)
-      st.write("Best Angle: ", angle)
-      st.image(path2)
+      st.image(path2, caption = 'Without Deskewing')
+    elif skew == 'With Deskewing':
+      delta = st.number_input('Insert a delta', min_value=0.01, max_value=1.0, value=0.1)
+      resize = st.number_input('Insert a resize', min_value=0.01, max_value=1.0, value=0.1)
+      if delta != 0 and resize != 0:
+        angle, deskew_image = dsk.correct_skew(real, delta, 10, resize)
+        path2 = cvToImage(deskew_image)
+        st.write("Best Angle: ", angle)
+        st.image(path2, caption = 'After Deskewing')
   else:
-    st.write(" Please upload the image first! 😄")
+    st.write(" Please upload the image first!")
 
   # Denoising ------------------------------
   st.header('Step 4: Denoising image')
@@ -127,7 +144,7 @@ def upload_image():
       st.image(result_rotate)
 
       read_thres = cv.imread('temp/predict.jpg',2)
-      ret, thres_img = cv.threshold(read_thres,230,255,cv.THRESH_BINARY)
+      ret, thres_img = cv.threshold(read_thres,235,255,cv.THRESH_BINARY)
       st.image(thres_img, caption="Threshold")
       cvToImage(thres_img)
 
@@ -150,13 +167,14 @@ def upload_image():
       image_array.save('temp/predict.jpg')
 
       read_thres = cv.imread('temp/predict.jpg',2)
-      ret, thres_img = cv.threshold(read_thres,230,255,cv.THRESH_BINARY)
+      ret, thres_img = cv.threshold(read_thres,235,255,cv.THRESH_BINARY)
+      
       st.image(thres_img, caption="Threshold")
       cvToImage(thres_img)
 
       after_denoise = True
   else:
-    st.write(" Please upload the image first! 😄")
+    st.write(" Please upload the image first!")
   
   st.header('Step 5: Evaluate Metrics')
   if after_denoise:
@@ -219,7 +237,7 @@ def upload_image():
       st.write("Accuracy Jaccard:", calculate)
 
   else:
-    st.write(" Please upload the image first! 😄")
+    st.write(" Please upload the image first!")
 
 page_names_to_funcs = {
     "Welcome": intro,
