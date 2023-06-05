@@ -52,7 +52,8 @@ def upload_image():
   if input_image != None:
     # convert image buat buka di openCV
     arrImg = np.array(img)
-    cvImg = cv.cvtColor(arrImg, cv.COLOR_RGB2BGR)
+    toBGR = cv.cvtColor(arrImg, cv.COLOR_RGB2BGR)
+    cvImg = cv.cvtColor(toBGR, cv.COLOR_BGR2RGB)
 
     # proses crop
     algo = st.radio(
@@ -70,21 +71,35 @@ def upload_image():
     else:
       if algo == 'Select line by its gradient':
           hough_image,drawed_img, drawed_img_lrtb, imgres, real = cr.crop_main(cvImg, 0)
+          colcrop1, colcrop2, colcrop3, colcrop4 = st.columns(4)
+          colcrop1.image(hough_image, caption = 'Hough Line')
+          colcrop2.image(drawed_img, caption = 'All Line')
+          colcrop3.image(drawed_img_lrtb, caption = 'Divided Line')
+          colcrop4.image(imgres, caption = 'Before Cropping')
       elif algo == 'Select line by intersection points (Outermost)':
-          _,_,_,_, real = cr.crop_main(cvImg, 1)
-          hough_image,drawed_img, drawed_img_lrtb, imgres, real = cr.crop_main(real, 1)
+          hough_image1,drawed_img1, drawed_img_lrtb1, imgres1, real1 = cr.crop_main(cvImg, 1)
+          hough_image2,drawed_img2, drawed_img_lrtb2, imgres2, real2 = cr.crop_main(real1, 1)
       elif algo == 'Select line by intersection points (Innermost)':
-          _,_,_,_, real = cr.crop_main(cvImg, 1)
-          hough_image,drawed_img, drawed_img_lrtb, imgres, real = cr.crop_main(real, 2)
+          hough_image1,drawed_img1, drawed_img_lrtb1, imgres1, real1 = cr.crop_main(cvImg, 1)
+          hough_image2,drawed_img2, drawed_img_lrtb2, imgres2, real2 = cr.crop_main(real1, 2)
       elif algo == 'Select line by intersection points (Energy)':
-          _,_,_,_, real = cr.crop_main(cvImg, 1)
-          hough_image,drawed_img, drawed_img_lrtb, imgres, real = cr.crop_main(real, 3)
+          hough_image1,drawed_img1, drawed_img_lrtb1, imgres1, real1 = cr.crop_main(cvImg, 1)
+          hough_image2,drawed_img2, drawed_img_lrtb2, imgres2, real2 = cr.crop_main(real1, 3)
       
-      colcrop1, colcrop2, colcrop3, colcrop4 = st.columns(4)
-      colcrop1.image(hough_image, caption = 'Hough Line')
-      colcrop2.image(drawed_img, caption = 'All Line')
-      colcrop3.image(drawed_img_lrtb, caption = 'Divided Line')
-      colcrop4.image(imgres, caption = 'Before Cropping')
+      if algo != 'Select line by its gradient':
+        st.text("Phase 1")
+        colcrop1, colcrop2, colcrop3, colcrop4 = st.columns(4)
+        st.text("Phase 2")
+        colcrop5, colcrop6, colcrop7, colcrop8 = st.columns(4)
+        colcrop1.image(hough_image1, caption = 'Hough Line')
+        colcrop2.image(drawed_img1, caption = 'All Line')
+        colcrop3.image(drawed_img_lrtb1, caption = 'Divided Line')
+        colcrop4.image(imgres1, caption = 'Before Cropping')
+        colcrop5.image(hough_image2, caption = 'Hough Line')
+        colcrop6.image(drawed_img2, caption = 'All Line')
+        colcrop7.image(drawed_img_lrtb2, caption = 'Divided Line')
+        colcrop8.image(imgres2, caption = 'Before Cropping')
+        real = real2
       st.image(real, caption = 'After Cropping')
       path1 = cvToImage(real)
       st.text(Image.open(path1).size)
@@ -117,62 +132,81 @@ def upload_image():
   # Denoising ------------------------------
   st.header('Step 4: Denoising image')
 
+  list_model = {'Learning Rate, Epoch, Batch Size': None,
+                '1e-3, 15, 4': 'model_denoising\model_potrait_17541240_15_4.h5',
+                '1e-3, 15, 8': 'model_denoising\model_potrait_17541240_15_8.h5',
+                '1e-3, 20, 4': 'model_denoising\model_potrait_17541240_20_4.h5',
+                '1e-3, 20, 8': 'model_denoising\model_potrait_17541240_20_8.h5',
+                '1e-3, 25, 4': 'model_denoising\model_potrait_17541240_25_4.h5',
+                '1e-3, 25, 8': 'model_denoising\model_potrait_17541240_25_8.h5',
+                '1e-4, 15, 4': 'model_denoising\model_potrait2_17541240_15_4.h5',
+                '1e-4, 15, 8': 'model_denoising\model_potrait2_17541240_15_8.h5',
+                '1e-4, 20, 4': 'model_denoising\model_potrait2_17541240_20_4.h5',
+                '1e-4, 20, 8': 'model_denoising\model_potrait2_17541240_20_8.h5',
+                '1e-4, 25, 4': 'model_denoising\model_potrait2_17541240_25_4.h5',
+                '1e-4, 25, 8': 'model_denoising\model_potrait2_17541240_25_8.h5'}
+
   if path2 != None:
     temp_image = Image.open(path2)
     check_size = temp_image.size
-    if check_size[0] > check_size[1]:
-      rotated_image = temp_image.rotate(90, expand=True)
-      resized_image = rotated_image.resize((1240,1754))
-      path_resize = 'temp/resize_image.jpg'
-      resized_image.save(path_resize)
-
-      Autoencoder = load_model('model_denoising/model_potrait_17541240_15_4.h5')
-      img_AE = keras.utils.load_img(path_resize, color_mode="grayscale")
-      images = keras.utils.img_to_array(img_AE, dtype='float32')/255
-      images = np.expand_dims(images, axis=0) # expand dimension of image
-
-      prediction = Autoencoder.predict(images)
-      # st.image(prediction)
-
-      # Mengambil gambar asli dari hasil prediksi
-      image_array = keras.preprocessing.image.array_to_img(prediction[0])
-      image_array.save('temp/predict.jpg')
-
-      result = Image.open('temp/predict.jpg')
-      result_rotate = result.rotate(-90, expand=True)
-      result_save = result_rotate.save('temp/predict.jpg')
-      st.image(result_rotate)
-
-      read_thres = cv.imread('temp/predict.jpg',2)
-      ret, thres_img = cv.threshold(read_thres,235,255,cv.THRESH_BINARY)
-      st.image(thres_img, caption="Threshold")
-      cvToImage(thres_img)
-
-      after_denoise = True
+    option = st.selectbox('Choose Model', list_model)
+    if option == 'Learning Rate, Epoch, Batch Size':
+       st.image(temp_image)
     else:
-      resized_image = temp_image.resize((1240,1754))
-      path_resize = 'temp/resize_image.jpg'
-      resized_image.save(path_resize)
+      st.write('You selected:', option)
+      if check_size[0] > check_size[1]:
+        rotated_image = temp_image.rotate(90, expand=True)
+        resized_image = rotated_image.resize((1240,1754))
+        path_resize = 'temp/resize_image.jpg'
+        resized_image.save(path_resize)
 
-      Autoencoder = load_model('model_denoising/model_potrait_17541240_15_4.h5')
-      img_AE = keras.utils.load_img(path_resize, color_mode="grayscale")
-      images = keras.utils.img_to_array(img_AE, dtype='float32')/255
-      images = np.expand_dims(images, axis=0) # expand dimension of image
+        Autoencoder = load_model(list_model[option])
+        img_AE = keras.utils.load_img(path_resize, color_mode="grayscale")
+        images = keras.utils.img_to_array(img_AE, dtype='float32')/255
+        images = np.expand_dims(images, axis=0) # expand dimension of image
 
-      prediction = Autoencoder.predict(images)
-      st.image(prediction)
+        prediction = Autoencoder.predict(images)
+        # st.image(prediction)
 
-      # Mengambil gambar asli dari hasil prediksi
-      image_array = keras.preprocessing.image.array_to_img(prediction[0])
-      image_array.save('temp/predict.jpg')
+        # Mengambil gambar asli dari hasil prediksi
+        image_array = keras.preprocessing.image.array_to_img(prediction[0])
+        image_array.save('temp/predict.jpg')
 
-      read_thres = cv.imread('temp/predict.jpg',2)
-      ret, thres_img = cv.threshold(read_thres,235,255,cv.THRESH_BINARY)
-      
-      st.image(thres_img, caption="Threshold")
-      cvToImage(thres_img)
+        result = Image.open('temp/predict.jpg')
+        result_rotate = result.rotate(-90, expand=True)
+        result_save = result_rotate.save('temp/predict.jpg')
+        # st.image(result_rotate)
 
-      after_denoise = True
+        read_thres = cv.imread('temp/predict.jpg',2)
+        ret, thres_img = cv.threshold(read_thres,235,255,cv.THRESH_BINARY)
+        st.image(thres_img, caption="Threshold")
+        cvToImage(thres_img)
+
+        after_denoise = True
+      else:
+        resized_image = temp_image.resize((1240,1754))
+        path_resize = 'temp/resize_image.jpg'
+        resized_image.save(path_resize)
+
+        Autoencoder = load_model(list_model[option])
+        img_AE = keras.utils.load_img(path_resize, color_mode="grayscale")
+        images = keras.utils.img_to_array(img_AE, dtype='float32')/255
+        images = np.expand_dims(images, axis=0) # expand dimension of image
+
+        prediction = Autoencoder.predict(images)
+        # st.image(prediction)
+
+        # Mengambil gambar asli dari hasil prediksi
+        image_array = keras.preprocessing.image.array_to_img(prediction[0])
+        image_array.save('temp/predict.jpg')
+
+        read_thres = cv.imread('temp/predict.jpg',2)
+        ret, thres_img = cv.threshold(read_thres,235,255,cv.THRESH_BINARY)
+        
+        st.image(thres_img, caption="Threshold")
+        cvToImage(thres_img)
+
+        after_denoise = True
   else:
     st.write(" Please upload the image first!")
   
@@ -195,6 +229,16 @@ def upload_image():
         img2_asli = cv.resize(base_image_toCV, (1240,1754))
         img2_prediksi = cv.resize(pred_image_toCV, (1240,1754))
 
+      # hitung precision and recall
+      tp = 2174960
+      fp = 3000
+      fn = 50
+      tp2 = 1487480
+      fn2 = 800000
+      precision = tp / (tp + fp)
+      recall = tp / (tp + fn)
+      recall2 = tp2 / (tp2 + fn2)
+      
       # Hitung MSE antara gambar asli dan hasil prediksi
       mse = np.mean((img2_asli - img2_prediksi) ** 2)
 
@@ -202,7 +246,12 @@ def upload_image():
       col1.image(img2_asli)
       col2.image(img2_prediksi)
 
-      st.subheader('1. Precision and Recall')
+      # st.subheader('1. Precision and Recall')
+      # st.write('Cropping')
+      # st.write('Hasil Precision:', precision*100, '%')
+      # st.write('Hasil Recall:', recall*100, '%')
+      # st.write('Deskewing')
+      # st.write('Hasil Recall:', recall2*100, '%')
 
       st.subheader('2. MSE')
       st.write('Hasil MSE:', mse)
@@ -213,7 +262,7 @@ def upload_image():
           psnr = 100
       else:
           pixel_max = 255.0
-          psnr = 20 * np.log10(pixel_max / np.sqrt(mse))
+          psnr = 10 * np.log10(pixel_max / mse)
 
       # mencetak nilai PSNR
       st.write('PSNR:', psnr)
@@ -221,7 +270,7 @@ def upload_image():
       st.subheader('4. Jaccard Similarity Index')
       jacc1, jacc2 = st.columns(2)
       pytesseract.pytesseract.tesseract_cmd = r'C:/Program Files/Tesseract-OCR/tesseract.exe'
-      custom_config=r'''--oem 3 --psm 4 -c tessedit_char_whitelist="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ .-,/\ 0123456789"'''
+      custom_config=r'''--oem 3 --psm 4'''
 
       ret, bw_asli = cv.threshold(img2_asli,230,255,cv.THRESH_BINARY)
       text_asli = pytesseract.image_to_string(bw_asli,config=custom_config)
