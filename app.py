@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 import cv2 as cv
+import os
 import jaccard as jc
 import pytesseract
 
@@ -41,6 +42,7 @@ def upload_image():
   path1 = None
   path2 = None
   after_denoise = False
+  without_denoise = False
 
   if input_image != None:
     st.image(input_image)
@@ -152,6 +154,8 @@ def upload_image():
     option = st.selectbox('Choose Model', list_model)
     if option == 'Learning Rate, Epoch, Batch Size':
        st.image(temp_image)
+       after_denoise = True
+       without_denoise = True
     else:
       st.write('You selected:', option)
       if check_size[0] > check_size[1]:
@@ -246,11 +250,11 @@ def upload_image():
       col1.image(img2_asli)
       col2.image(img2_prediksi)
 
-      # st.subheader('1. Precision and Recall')
-      # st.write('Cropping')
+      st.subheader('1. Precision and Recall')
+      st.write('Cropping')
       # st.write('Hasil Precision:', precision*100, '%')
       # st.write('Hasil Recall:', recall*100, '%')
-      # st.write('Deskewing')
+      st.write('Deskewing')
       # st.write('Hasil Recall:', recall2*100, '%')
 
       st.subheader('2. MSE')
@@ -268,6 +272,12 @@ def upload_image():
       st.write('PSNR:', psnr)
 
       st.subheader('4. Jaccard Similarity Index')
+      #open text file in read mode
+      text_name = os.path.splitext(input_image.name)[0]
+      text_file = open("ground_truth_jaccard/"+text_name+".txt", "r")
+      #read whole file to a string
+      data_string = text_file.read()
+
       jacc1, jacc2 = st.columns(2)
       pytesseract.pytesseract.tesseract_cmd = r'C:/Program Files/Tesseract-OCR/tesseract.exe'
       custom_config=r'''--oem 3 --psm 4'''
@@ -275,16 +285,19 @@ def upload_image():
       ret, bw_asli = cv.threshold(img2_asli,230,255,cv.THRESH_BINARY)
       text_asli = pytesseract.image_to_string(bw_asli,config=custom_config)
       jacc1.text("Expected")
-      jacc1.write(text_asli)
+      jacc1.write(data_string)
 
-      ret, bw_pred = cv.threshold(img2_prediksi,230,255,cv.THRESH_BINARY)
-      text_pred = pytesseract.image_to_string(bw_pred,config=custom_config)
+      if without_denoise:
+        ret, bw_pred = cv.threshold(pred_image_toCV,230,255,cv.THRESH_BINARY)
+        text_pred = pytesseract.image_to_string(bw_pred,config=custom_config)
+      else:
+        ret, bw_pred = cv.threshold(img2_prediksi,230,255,cv.THRESH_BINARY)
+        text_pred = pytesseract.image_to_string(bw_pred,config=custom_config)
       jacc2.text("Resulted")
       jacc2.write(text_pred)
 
       calculate = jc.Jaccard_Similarity(text_asli, text_pred)
       st.write("Accuracy Jaccard:", calculate)
-
   else:
     st.write(" Please upload the image first!")
 
