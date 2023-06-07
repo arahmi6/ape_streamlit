@@ -1,11 +1,11 @@
 import cv2
 import numpy as np
-from scipy.ndimage import interpolation as inter
+from scipy.ndimage import rotate
 
 class Deskew():
-  def correct_skew(image, delta=1, limit=5, resize=1):
+  def correct_skew(image, delta=1.0, limit=5.0, resize=1.0):
       def determine_score(arr, angle):
-          data = inter.rotate(arr, angle, reshape=False, order=0)
+          data = rotate(arr, angle, reshape=False, order=0)
           histogram = np.sum(data, axis=1, dtype=float)
           score = np.sum((histogram[1:] - histogram[:-1]) ** 2, dtype=float)
           return histogram, score
@@ -30,5 +30,9 @@ class Deskew():
       # Menghitung koordinat 4 titik sudut
       corners = np.array([[0, 0], [w, 0], [w, h], [0, h]], dtype=np.float32)
       transformed_corners = cv2.transform(np.array([corners]), M)[0]
-      print("Transformed Corners:",transformed_corners)
-      return best_angle, corrected
+      def convert_to_tuple(matrix):
+        tuple_list = []
+        for row in matrix:
+            tuple_list.append(tuple(row))
+        return tuple_list
+      return best_angle, corrected, convert_to_tuple(transformed_corners)

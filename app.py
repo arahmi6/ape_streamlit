@@ -121,9 +121,9 @@ def upload_image():
       integer_coords = [(int(x), int(y)) for x, y in float_coords]     
       gt_mask, pred_mask, tp, tn, fp, fn, precision, recall = pr.precrec(cvImg, gt_crop[text_name], integer_coords)
       st.subheader('Precision and Recall')
-      colcrop1, colcrop2 = st.columns(2)
-      colcrop1.image(gt_mask, caption="Ground Truth")
-      colcrop2.image(pred_mask, caption="Prediction")
+      # colcrop1, colcrop2 = st.columns(2)
+      # colcrop1.image(gt_mask, caption="Ground Truth")
+      # colcrop2.image(pred_mask, caption="Prediction")
       st.write('Hasil Precision:', precision*100, '%')
       st.write('Hasil Recall:', recall*100, '%')
   else:
@@ -145,10 +145,33 @@ def upload_image():
       delta = st.number_input('Insert a delta', min_value=0.01, max_value=1.0, value=0.1)
       resize = st.number_input('Insert a resize', min_value=0.01, max_value=1.0, value=0.1)
       if delta != 0 and resize != 0:
-        angle, deskew_image = dsk.correct_skew(real, delta, 10, resize)
+        angle, deskew_image, transformed_corners = dsk.correct_skew(real, delta, 10, resize)
         path2 = cvToImage(deskew_image)
         st.write("Best Angle: ", angle)
         st.image(path2, caption = 'After Deskewing')
+        text_name = os.path.splitext(input_image.name)[0]
+        gt_skew = {'001': [(6.088805, -4.30718), (1246.0585, 4.349582), (1233.9111, 1744.3073), (-6.058587, 1735.6505)],
+                  '002': [(6.088805, -4.30718), (1246.0585, 4.349582), (1233.9111, 1744.3073), (-6.058587, 1735.6505)],
+                  '003': [(25.45153, -14.456479), (1707.1954, 14.898467), (1656.5485, 2916.4565), (-25.19535, 2887.1016)], 
+                  '004': [(-79.55149, 57.09159), (1605.928, -51.90348), (1768.6139, 2463.8418), (83.13447, 2572.837)],
+                  '005': [(10.8791065, -7.2916865), (1692.8151, 7.3863463), (1671.121, 2493.2915), (-10.81506, 2478.6135)],
+                  '006': [(-24.021786, 17.678148), (1218.4937, -17.028448), (1267.0215, 1720.294), (24.506023, 1755.0005)],
+                  '007': [(-10.220677, 8.01229), (1510.6959, -7.9152946), (1531.2206, 1951.9773), (10.304021, 1967.9049)],
+                  '008': [(-1.2743165, 1.7412058), (1992.7227, -1.738979), (1995.2743, 1460.2587), (1.2773535, 1463.7389)],
+                  '009': [(-11.742084, 16.816034), (1727.9373, -16.587515), (1751.7421, 1223.184), (12.062743, 1256.5875)],
+                  '010': [(-18.010149, 26.08252), (1721.224, -25.536747), (1758.0103, 1213.9175), (18.775995, 1265.5367)]}
+        float_coords = transformed_corners
+        print("Float",float_coords)
+        print("Transform",transformed_corners)
+        integer_coords = [(int(x), int(y)) for x, y in float_coords]
+        print("Integer",integer_coords)     
+        gt_mask, pred_mask, tp, tn, fp, fn, precision, recall = pr.precrec(real, [(int(x), int(y)) for x, y in gt_skew[text_name]], integer_coords)
+        st.subheader('Precision and Recall')
+        # colcrop1, colcrop2 = st.columns(2)
+        # colcrop1.image(gt_mask, caption="Ground Truth")
+        # colcrop2.image(pred_mask, caption="Prediction")
+        st.write('Hasil Precision:', precision*100, '%')
+        st.write('Hasil Recall:', recall*100, '%')
   else:
     st.write(" Please upload the image first!")
 
