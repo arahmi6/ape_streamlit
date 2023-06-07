@@ -11,6 +11,7 @@ from tensorflow import keras
 from PIL import Image
 import cropping as cr
 from deskewing import Deskew as dsk
+import pr
 
 def intro():
     st.write("# Welcome! 👋")
@@ -72,21 +73,21 @@ def upload_image():
        path1 = cvToImage(real)
     else:
       if algo == 'Select line by its gradient':
-          hough_image,drawed_img, drawed_img_lrtb, imgres, real = cr.crop_main(cvImg, 0)
+          hough_image, drawed_img, drawed_img_lrtb, imgres, real, best_kiri_atas_crop, best_kiri_bawah_crop, best_kanan_atas_crop, best_kanan_bawah_crop = cr.crop_main(cvImg, 0)
           colcrop1, colcrop2, colcrop3, colcrop4 = st.columns(4)
           colcrop1.image(hough_image, caption = 'Hough Line')
           colcrop2.image(drawed_img, caption = 'All Line')
           colcrop3.image(drawed_img_lrtb, caption = 'Divided Line')
           colcrop4.image(imgres, caption = 'Before Cropping')
       elif algo == 'Select line by intersection points (Outermost)':
-          hough_image1,drawed_img1, drawed_img_lrtb1, imgres1, real1 = cr.crop_main(cvImg, 1)
-          hough_image2,drawed_img2, drawed_img_lrtb2, imgres2, real2 = cr.crop_main(real1, 1)
+          hough_image1,drawed_img1, drawed_img_lrtb1, imgres1, real1, best_kiri_atas_crop, best_kiri_bawah_crop, best_kanan_atas_crop, best_kanan_bawah_crop  = cr.crop_main(cvImg, 1)
+          hough_image2,drawed_img2, drawed_img_lrtb2, imgres2, real2, best_kiri_atas_crop, best_kiri_bawah_crop, best_kanan_atas_crop, best_kanan_bawah_crop  = cr.crop_main(real1, 1)
       elif algo == 'Select line by intersection points (Innermost)':
-          hough_image1,drawed_img1, drawed_img_lrtb1, imgres1, real1 = cr.crop_main(cvImg, 1)
-          hough_image2,drawed_img2, drawed_img_lrtb2, imgres2, real2 = cr.crop_main(real1, 2)
+          hough_image1,drawed_img1, drawed_img_lrtb1, imgres1, real1, best_kiri_atas_crop, best_kiri_bawah_crop, best_kanan_atas_crop, best_kanan_bawah_crop  = cr.crop_main(cvImg, 1)
+          hough_image2,drawed_img2, drawed_img_lrtb2, imgres2, real2, best_kiri_atas_crop, best_kiri_bawah_crop, best_kanan_atas_crop, best_kanan_bawah_crop  = cr.crop_main(real1, 2)
       elif algo == 'Select line by intersection points (Energy)':
-          hough_image1,drawed_img1, drawed_img_lrtb1, imgres1, real1 = cr.crop_main(cvImg, 1)
-          hough_image2,drawed_img2, drawed_img_lrtb2, imgres2, real2 = cr.crop_main(real1, 3)
+          hough_image1,drawed_img1, drawed_img_lrtb1, imgres1, real1, best_kiri_atas_crop, best_kiri_bawah_crop, best_kanan_atas_crop, best_kanan_bawah_crop  = cr.crop_main(cvImg, 1)
+          hough_image2,drawed_img2, drawed_img_lrtb2, imgres2, real2, best_kiri_atas_crop, best_kiri_bawah_crop, best_kanan_atas_crop, best_kanan_bawah_crop  = cr.crop_main(real1, 3)
       
       if algo != 'Select line by its gradient':
         st.text("Phase 1")
@@ -105,6 +106,26 @@ def upload_image():
       st.image(real, caption = 'After Cropping')
       path1 = cvToImage(real)
       st.text(Image.open(path1).size)
+      text_name = os.path.splitext(input_image.name)[0]
+      gt_crop = {'001': [(0, 0), (real.shape[1], 0), (real.shape[1], real.shape[0]), (0, real.shape[0])],
+                 '002': [(0, 0), (real.shape[1], 0), (real.shape[1], real.shape[0]), (0, real.shape[0])],
+                 '003': [(0, 320), (real.shape[1], 413), (real.shape[1], 3293), (0, 3233)], 
+                 '004': [(0, 723), (1610, 696), (real.shape[1], 3213), (0, 3306)],
+                 '005': [(0, 486), (1656, 422), (real.shape[1], 2936), (0, 2983)],
+                 '006': [(0, 0), (real.shape[1], 0), (real.shape[1], real.shape[0]), (0, real.shape[0])], 
+                 '007': [(116, 52), (1430, 24), (1532, 1992), (28, 2028)],
+                 '008': [(82, 42), (1996, 32), (2018, 1440), (50, 1424)],
+                 '009': [(0, 0), (real.shape[1], 0), (real.shape[1], real.shape[0]), (0, real.shape[0])],
+                 '010': [(0, 0), (real.shape[1], 0), (real.shape[1], real.shape[0]), (0, real.shape[0])]}
+      float_coords = [best_kiri_atas_crop, best_kanan_atas_crop, best_kanan_bawah_crop, best_kiri_bawah_crop]
+      integer_coords = [(int(x), int(y)) for x, y in float_coords]     
+      gt_mask, pred_mask, tp, tn, fp, fn, precision, recall = pr.precrec(cvImg, gt_crop[text_name], integer_coords)
+      st.subheader('Precision and Recall')
+      colcrop1, colcrop2 = st.columns(2)
+      colcrop1.image(gt_mask, caption="Ground Truth")
+      colcrop2.image(pred_mask, caption="Prediction")
+      st.write('Hasil Precision:', precision*100, '%')
+      st.write('Hasil Recall:', recall*100, '%')
   else:
     st.write(" Please upload the image first!")
 
@@ -232,11 +253,7 @@ def upload_image():
       else:
         img2_asli = cv.resize(base_image_toCV, (1240,1754))
         img2_prediksi = cv.resize(pred_image_toCV, (1240,1754))
-
-      # hitung precision and recall
-      tp = 2174960
-      fp = 3000
-      fn = 50
+      
       tp2 = 1487480
       fn2 = 800000
       precision = tp / (tp + fp)
@@ -252,6 +269,9 @@ def upload_image():
 
       st.subheader('1. Precision and Recall')
       st.write('Cropping')
+      # colcrop1, colcrop2 = st.columns(2)
+      # colcrop1.image(gt_mask)
+      # colcrop2.image(pred_mask)
       # st.write('Hasil Precision:', precision*100, '%')
       # st.write('Hasil Recall:', recall*100, '%')
       st.write('Deskewing')
