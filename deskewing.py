@@ -27,5 +27,8 @@ class Deskew():
       M = cv2.getRotationMatrix2D(center, best_angle, 1.0)
       corrected = cv2.warpAffine(orig_img, M, (w, h), flags=cv2.INTER_CUBIC, \
               borderMode=cv2.BORDER_REPLICATE)
-
+      # Menghitung koordinat 4 titik sudut
+      corners = np.array([[0, 0], [w, 0], [w, h], [0, h]], dtype=np.float32)
+      transformed_corners = cv2.transform(np.array([corners]), M)[0]
+      print("Transformed Corners:",transformed_corners)
       return best_angle, corrected
