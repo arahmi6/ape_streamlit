@@ -22,9 +22,9 @@ def calculate_tp_tn_fp_fn(gt_rect, pred_rect, image_size):
     tp = tn = fp = fn = 0
     gt_mask = np.zeros(image_size, dtype=np.uint8)
     pred_mask = np.zeros(image_size, dtype=np.uint8)
-    print("GT",gt_rect)
-    print("PRED",pred_rect)
-    print("IMAGE SIZE",image_size)
+    # print("GT",gt_rect)
+    # print("PRED",pred_rect)
+    # print("IMAGE SIZE",image_size)
     cv2.drawContours(gt_mask, [np.array(gt_rect)], -1, 255, thickness=cv2.FILLED)
     cv2.drawContours(pred_mask, [np.array(pred_rect)], -1, 255, thickness=cv2.FILLED)
 
@@ -53,8 +53,8 @@ def resize_image_percent(image, scale_percent):
 def precrec(image, gt_rect_coords, pred_rect_coords):
     # # Mendefinisikan path file gambar asli
     # image_path = '003.jpg'
-    print("GT",gt_rect_coords)
-    print("PRED",pred_rect_coords)
+    # print("GT",gt_rect_coords)
+    # print("PRED",pred_rect_coords)
     # print("IMAGE",image)
     # # Membaca gambar menggunakan cv2.imread()
     # image = cv2.imread(image_path)
@@ -63,7 +63,8 @@ def precrec(image, gt_rect_coords, pred_rect_coords):
     image_size = image.shape[:2]  # Mengambil ukuran gambar dari shape
     # gt_rect_coords = [(0, 320), (image_size[1], 413), (image_size[1], 3293), (0, 3233)]  # Koordinat segiempat ground truth
     # pred_rect_coords = [(0, 320), (image_size[1]-100, 413), (image_size[1]-100, image_size[0]), (0, image_size[0])]  # Koordinat segiempat hasil prediksi
-
+    print("gt_rect_coords",gt_rect_coords)
+    print("pred_rect_coords",pred_rect_coords)
     tp, tn, fp, fn = calculate_tp_tn_fp_fn(gt_rect_coords, pred_rect_coords, image_size)
 
     # Menghitung persentase tp, tn, fp, fn
@@ -74,10 +75,10 @@ def precrec(image, gt_rect_coords, pred_rect_coords):
     fn_percent = (fn / total_pixels) * 100
 
     # Menampilkan hasil
-    print("TP:", tp, "(", tp_percent, "% )")
-    print("TN:", tn, "(", tn_percent, "% )")
-    print("FP:", fp, "(", fp_percent, "% )")
-    print("FN:", fn, "(", fn_percent, "% )")
+    # print("TP:", tp, "(", tp_percent, "% )")
+    # print("TN:", tn, "(", tn_percent, "% )")
+    # print("FP:", fp, "(", fp_percent, "% )")
+    # print("FN:", fn, "(", fn_percent, "% )")
 
     # Menghitung precision dan recall
     precision = tp / (tp + fp)
@@ -85,8 +86,8 @@ def precrec(image, gt_rect_coords, pred_rect_coords):
 
     precision_percent = precision * 100
     recall_percent = recall * 100
-    print("Precision:", precision, "(", precision_percent, "% )")
-    print("Recall:", recall, "(", recall_percent, "% )")
+    # print("Precision:", precision, "(", precision_percent, "% )")
+    # print("Recall:", recall, "(", recall_percent, "% )")
 
     # Menampilkan hasil pada gambar
     gt_mask = image.copy()
