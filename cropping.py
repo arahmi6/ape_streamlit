@@ -749,6 +749,10 @@ def crop_main(path_image, cara = 0):
     best_kanan_bawah_real = timesten(best_kanan_bawah)
     if(check_line_under_onefourth(img, best_kiri_atas_real, best_kiri_bawah_real, best_kanan_atas_real, best_kanan_bawah_real)):
         real = orig_img.copy()
+        best_kiri_atas_real = (0.0, 0.0)
+        best_kiri_bawah_real = (0.0, orig_img.shape[0])
+        best_kanan_atas_real = (orig_img.shape[1], 0.0)
+        best_kanan_bawah_real = (orig_img.shape[1], orig_img.shape[0])
     else:
         real = show_cropped_and_skewed(orig_img, best_kiri_atas_real, best_kiri_bawah_real, best_kanan_atas_real, best_kanan_bawah_real)
-    return  hough_image, drawed_img, drawed_img_lrtb, imgres, real
+    return  hough_image, drawed_img, drawed_img_lrtb, imgres, real, best_kiri_atas_real, best_kiri_bawah_real, best_kanan_atas_real, best_kanan_bawah_real
